@@ -368,6 +368,116 @@
 		*/
 		return
 
+	proc/scan_card(var/obj/item/I) // procs- from manufacturer/rockbox
+		if (istype(I, /obj/item/device/pda2))
+			var/obj/item/device/pda2/P = I
+			if(P.ID_card)
+				I = P.ID_card
+			if (istype(I, /obj/item/card/id))
+				var/obj/item/card/id/ID = I
+				boutput(usr, "<span class='notice'>You swipe the ID card in the card reader.</span>")
+				var/datum/db_record/account = null
+				account = FindBankAccountByName(ID.registered)
+				if(account)
+					var/enterpin = usr.enter_pin("Card Reader")
+					if (enterpin == ID.pin)
+						boutput(usr, "<span class='notice'>Card authorized.</span>")
+						src.scan = ID
+						return 1
+					else
+						boutput(usr, "<span class='alert'>Pin number incorrect.</span>")
+						src.scan = null
+				else
+					boutput(usr, "<span class='alert'>No bank account associated with this ID found.</span>")
+					src.scan = null
+		return 0
+
+
+
+/// html interaction
+	Topic(href, href_list)
+		if ((usr.contents.Find(src) || ((get_dist(src, usr) <= 1 || isAI(usr)) && istype(src.loc, /turf))))
+			src.add_dialog(usr)
+			if (href_list["card"])
+				if (src.scan) src.scan = null
+				else
+					var/obj/item/I = usr.equipped()
+					src.scan_card(I)
+
+			if (href_list["purchase"])
+				var/obj/machinery/ore_cloud_storage_container/storage = locate(href_list["storage"])
+				var/ore = href_list["ore"]
+				var/datum/ore_cloud_data/OCD = storage.ores[ore]
+				var/price = OCD.price
+				var/taxes = round(max(rockbox_globals.rockbox_client_fee_min,abs(price*rockbox_globals.rockbox_client_fee_pct/100)),0.01) //transaction taxes for the station budget
+
+				if(storage?.broken)
+					return
+
+				if(!scan)
+					src.temp = {"You have to scan a card in first.<BR>"}
+					src.updateUsrDialog()
+					return
+				else
+					src.temp = null
+				if (src.scan.registered in FrozenAccounts)
+					boutput(usr, "<span class='alert'>Your account cannot currently be liquidated due to active borrows.</span>")
+					return
+				var/datum/db_record/account = null
+				account = FindBankAccountByName(src.scan.registered)
+				if (account)
+					var/quantity = 1
+					quantity = max(0, input("How many units do you want to purchase?", "Ore Purchase", null, null) as num)
+					if(!isnum_safe(quantity))
+						return
+
+					if(OCD.amount >= quantity && quantity > 0)
+						var/subtotal = round(price * quantity)
+						var/sum_taxes = round(taxes * quantity)
+						var/rockbox_fees = (!rockbox_globals.rockbox_premium_purchased ? rockbox_globals.rockbox_standard_fee : 0) * quantity
+						var/total = subtotal + sum_taxes + rockbox_fees
+						if(account["current_money"] >= total)
+							account["current_money"] -= total
+							storage.eject_ores(ore, get_output_location(), quantity, transmit=1, user=usr)
+
+							 // This next bit is stolen from PTL Code
+							var/list/accounts = \
+								data_core.bank.find_records("job", "Chief Engineer") + \
+								data_core.bank.find_records("job", "Chief Engineer") + \
+								data_core.bank.find_records("job", "Engineer")
+
+
+							var/datum/signal/minerSignal = get_free_signal()
+							minerSignal.source = src
+							//any non-divisible amounts go to the shipping budget
+							var/leftovers = 0
+							if(length(accounts))
+								leftovers = subtotal % length(accounts)
+								var/divisible_amount = subtotal - leftovers
+								if(divisible_amount)
+									var/amount_per_account = divisible_amount/length(accounts)
+									for(var/datum/db_record/t as anything in accounts)
+										t["current_money"] += amount_per_account
+									minerSignal.data = list("address_1"="00000000", "command"="text_message", "sender_name"="ROCKBOX&trade;-MAILBOT",  "group"=list(MGD_MINING, MGA_SALES), "sender"=src.net_id, "message"="Notification: [amount_per_account] credits earned from Rockbox&trade; sale, deposited to your account.")
+							else
+								leftovers = subtotal
+								minerSignal.data = list("address_1"="00000000", "command"="text_message", "sender_name"="ROCKBOX&trade;-MAILBOT",  "group"=list(MGD_MINING, MGA_SALES), "sender"=src.net_id, "message"="Notification: [leftovers + sum_taxes] credits earned from Rockbox&trade; sale, deposited to the shipping budget.")
+							wagesystem.shipping_budget += (leftovers + sum_taxes)
+							SEND_SIGNAL(src, COMSIG_MOVABLE_POST_RADIO_PACKET, minerSignal)
+
+							src.temp = {"Enjoy your purchase!<BR>"}
+						else
+							src.temp = {"You don't have enough dosh, bucko.<BR>"}
+					else
+						if(quantity > 0)
+							src.temp = {"I don't have that many for sale, champ.<BR>"}
+						else
+							src.temp = {"Enter some actual valid number, you doofus!<BR>"}
+				else
+					src.temp = {"That card doesn't have an account anymore, you might wanna get that checked out.<BR>"}
+
+			src.updateUsrDialog()
+		return
 	ex_act(severity)
 		return
 
