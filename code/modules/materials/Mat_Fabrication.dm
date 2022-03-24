@@ -95,9 +95,15 @@
 
 	var/output_target = null
 
+	var/obj/item/card/id/scan = null // these three are important for rockbox interaction
+	var/temp = null
+	var/net_id = null
+
 	New()
 		for(var/R in blueprints)
 			recipes.Add(new R())
+		src.net_id = generate_net_id(src)
+		START_TRACKING
 		..()
 
 	attack_hand(mob/user as mob)
