@@ -148,6 +148,7 @@
 	O.verbs += /mob/living/silicon/ai/proc/ai_colorchange
 	O.verbs += /mob/living/silicon/ai/proc/ai_station_announcement
 	O.verbs += /mob/living/silicon/ai/proc/view_messageLog
+	O.verbs += /mob/living/silicon/ai/verb/rename_self
 	O.job = "AI"
 
 	SPAWN(0)
@@ -229,7 +230,7 @@
 			src.mind.transfer_to(cyborg)
 	cyborg.set_loc(get_turf(src.loc))
 	if (syndicate)
-		cyborg.handle_robot_antagonist_status("converted")
+		cyborg.make_syndicate("Robotize_MK2 (probably cyborg converter)")
 		boutput(cyborg, "<B>You have been transformed into a <i>syndicate</i> Cyborg. Cyborgs can interact with most electronic objects in their view.</B>")
 		boutput(cyborg, "<B>You must follow your laws and assist syndicate agents, who are identifiable by their icon.</B>")
 	else
@@ -323,7 +324,7 @@
 				W.set_loc(locate(1, 1, 1))
 		else
 			W.set_loc(T)
-		SHOW_SLASHER_TIPS(src)
+		src.show_antag_popup("slasher")
 		if(src.mind)
 			src.mind.transfer_to(W)
 			src.mind.special_role = "slasher"
@@ -717,6 +718,9 @@ var/list/antag_respawn_critter_types =  list(/mob/living/critter/small_animal/fl
 	set desc = "Visit the Afterlife Bar"
 	set category = null
 
+	if (current_state < GAME_STATE_PLAYING)
+		boutput(src, "It's too early to go to the bar!")
+		return
 	if(!isdead(src) || !src.mind || !ticker || !ticker.mode)
 		return
 	if (ticker?.mode && istype(ticker.mode, /datum/game_mode/football))

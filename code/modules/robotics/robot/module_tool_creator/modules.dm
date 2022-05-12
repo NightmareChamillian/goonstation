@@ -59,6 +59,8 @@
 		/obj/item/device/igniter,
 		/obj/item/saw/cyborg,
 		/obj/item/satchel/hydro, // TODO: make more versatile version
+		/obj/item/satchel/hydro,
+		/obj/item/satchel/hydro,
 		/obj/item/paper_bin/robot,
 		/obj/item/reagent_containers/glass/bucket, // TODO: make large version
 		/obj/item/spraybottle/cleaner/robot,
@@ -123,6 +125,9 @@
 		/obj/item/rcd,
 		/obj/item/lamp_manufacturer,
 		/obj/item/deconstructor/borg,
+		#ifdef MAP_OVERRIDE_OSHAN
+			/obj/item/mining_tool/power_shovel/borg,
+		#endif
 		/datum/robot/module_tool_creator/item_type/amount/steel_tile,
 		/datum/robot/module_tool_creator/item_type/amount/steel_rod,
 		/datum/robot/module_tool_creator/item_type/amount/steel_sheet,

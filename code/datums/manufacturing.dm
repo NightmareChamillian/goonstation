@@ -125,6 +125,16 @@ ABSTRACT_TYPE(/datum/manufacture)
 	create = 1
 	frame_path = /obj/disposalpipe/loafer
 
+/******************** AI Law Rack *******************/
+
+/datum/manufacture/mechanics/lawrack
+	name = "AI Law Rack Mount"
+	item_paths = list("MET-1", "MET-2", "INS-1" , "CON-1")
+	item_amounts = list(20,5,10,10)
+	time = 60 SECONDS
+	create = 1
+	frame_path = /obj/machinery/lawrack
+
 /******************** AI display (temp) *******************/
 
 /datum/manufacture/mechanics/ai_status_display
@@ -2098,6 +2108,15 @@ ABSTRACT_TYPE(/datum/manufacture)
 	create = 1
 	category = "Clothing"
 
+/datum/manufacture/hat_purple
+	name = "Purple Hat"
+	item_paths = list("FAB-1")
+	item_amounts = list(2)
+	item_outputs = list(/obj/item/clothing/head/purple)
+	time = 2 SECONDS
+	create = 1
+	category = "Clothing"
+
 /datum/manufacture/hat_tophat
 	name = "Top Hat"
 	item_paths = list("FAB-1")
@@ -2166,6 +2185,16 @@ ABSTRACT_TYPE(/datum/manufacture)
 	item_paths = list("FAB-1")
 	item_amounts = list(4)
 	item_outputs = list(/obj/item/clothing/under/color/blue)
+	time = 5 SECONDS
+	create = 1
+	category = "Clothing"
+
+
+/datum/manufacture/jumpsuit_purple
+	name = "Purple Jumpsuit"
+	item_paths = list("FAB-1")
+	item_amounts = list(4)
+	item_outputs = list(/obj/item/clothing/under/color/purple)
 	time = 5 SECONDS
 	create = 1
 	category = "Clothing"
@@ -2467,6 +2496,15 @@ ABSTRACT_TYPE(/datum/manufacture)
 	create = 3 //because a shoe god has to have acolytes
 	category = "Clothing"
 
+/datum/manufacture/towel
+	name = "Towel"
+	item_paths = list("FAB-1")
+	item_amounts = list(8)
+	item_outputs = list(/obj/item/cloth/towel/white)
+	time = 8 SECONDS
+	create = 1
+	category = "Resource"
+
 /////// pod construction components
 
 /datum/manufacture/pod/parts
@@ -2534,8 +2572,6 @@ ABSTRACT_TYPE(/datum/manufacture)
 
 ABSTRACT_TYPE(/datum/manufacture/sub)
 
-#ifdef UNDERWATER_MAP
-
 /datum/manufacture/sub/parts
 	name = "Minisub Frame Kit"
 	item_paths = list("MET-2")
@@ -2571,7 +2607,6 @@ ABSTRACT_TYPE(/datum/manufacture/sub)
 	time = 5 SECONDS
 	create = 1
 	category = "Component"
-#endif
 
 ABSTRACT_TYPE(/datum/manufacture/putt)
 

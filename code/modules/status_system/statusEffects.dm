@@ -659,6 +659,9 @@
 				var/mob/living/carbon/human/H = owner
 				prot = (1 - (H.get_heat_protection() / 100))
 
+				if (H.traitHolder?.hasTrait("burning")) //trait 'burning' is human torch
+					duration += timePassed										//this makes the fire counter not increment on its own
+
 			if(ismob(owner) && owner:is_heat_resistant())
 				prot = 0
 
@@ -2093,3 +2096,45 @@
 			APC.lighting = oldstate
 			APC.UpdateIcon()
 			APC.update()
+
+/datum/statusEffect/filthy
+	id = "filthy"
+	name = "Filthy"
+	desc = "You're absolutely filthy."
+	icon_state = "filthy"
+	maxDuration = 3 MINUTES
+	var/mob/living/carbon/human/H
+
+	onAdd(optional)
+		. = ..()
+		if(ishuman(owner))
+			H = owner
+
+	onUpdate(timePassed)
+		. = ..()
+		if (H?.sims?.getValue("Hygiene") > SIMS_HYGIENE_THRESHOLD_CLEAN)
+			H.delStatus("filthy")
+
+
+	onRemove()
+		. = ..()
+		if (H.sims?.getValue("Hygiene") < SIMS_HYGIENE_THRESHOLD_FILTHY)
+			H.setStatus("rancid", null)
+
+/datum/statusEffect/rancid
+	id = "rancid"
+	name = "Rancid"
+	desc = "You smell like spoiled milk."
+	icon_state = "rancid"
+
+	onAdd(optional)
+		. = ..()
+		if(ismob(owner))
+			var/mob/M = owner
+			M.bioHolder.AddEffect("sims_stinky")
+
+	onRemove()
+		. = ..()
+		if(ismob(owner))
+			var/mob/M = owner
+			M.bioHolder.RemoveEffect("sims_stinky")

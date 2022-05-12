@@ -179,9 +179,7 @@
 /turf/simulated/floor/airless/plating/damaged3,
 /area/space)
 "aaz" = (
-/turf/space{
-	icon_state = "aplaceholder"
-	},
+/turf/space/asteroid,
 /area/space)
 "aaA" = (
 /obj/grille/steel,
@@ -280,9 +278,7 @@
 	name = "Mining Outpost"
 	},
 /obj/lattice,
-/turf/space{
-	icon_state = "aplaceholder"
-	},
+/turf/space/asteroid,
 /area/space)
 "aaJ" = (
 /obj/landmark/magnet_shield,
@@ -31636,7 +31632,7 @@
 /turf/simulated/floor,
 /area/station/engine/engineering)
 "btR" = (
-/turf/simulated/wall/asteroid,
+/turf/simulated/wall/auto/asteroid,
 /area/space)
 "btS" = (
 /obj/machinery/light,
@@ -31644,27 +31640,27 @@
 /area/station/engine/engineering)
 "btT" = (
 /turf/simulated/wall/r_wall,
-/area/station/security/armory)
+/area/station/ai_monitored/armory)
 "btU" = (
 /obj/storage/secure/closet/security/armory,
 /turf/simulated/floor,
-/area/station/security/armory)
+/area/station/ai_monitored/armory)
 "btV" = (
 /turf/simulated/floor,
-/area/station/security/armory)
+/area/station/ai_monitored/armory)
 "btW" = (
 /obj/rack,
 /turf/simulated/floor,
-/area/station/security/armory)
+/area/station/ai_monitored/armory)
 "btX" = (
 /obj/machinery/light{
 	dir = 1;
 	name = "light fixture"
 	},
 /turf/simulated/floor,
-/area/station/security/armory)
+/area/station/ai_monitored/armory)
 "btY" = (
-/turf/simulated/wall/asteroid{
+/turf/simulated/wall/auto/asteroid{
 	icon_state = "ast1"
 	},
 /area/space)
@@ -31675,7 +31671,7 @@
 	name = "Sorry"
 	},
 /turf/simulated/floor,
-/area/station/security/armory)
+/area/station/ai_monitored/armory)
 "bua" = (
 /turf/simulated/wall/r_wall,
 /area/station/security/prison)
@@ -31718,7 +31714,7 @@
 	},
 /area/space)
 "buf" = (
-/turf/simulated/wall/asteroid{
+/turf/simulated/wall/auto/asteroid{
 	icon_state = "ast1"
 	},
 /area/syndicate_station)
@@ -31735,19 +31731,19 @@
 	name = "Fire Range Robot"
 	},
 /turf/simulated/floor,
-/area/station/security/armory)
+/area/station/ai_monitored/armory)
 "bui" = (
 /obj/table/reinforced/auto,
 /obj/item/clothing/ears/earmuffs,
 /turf/simulated/floor,
-/area/station/security/armory)
+/area/station/ai_monitored/armory)
 "buj" = (
 /obj/machinery/portable_atmospherics/canister/sleeping_agent,
 /turf/simulated/floor,
-/area/station/security/armory)
+/area/station/ai_monitored/armory)
 "buk" = (
 /turf/simulated/wall,
-/area/station/security/armory)
+/area/station/ai_monitored/armory)
 "bul" = (
 /obj/storage/closet/emergency,
 /turf/simulated/floor,
@@ -31858,7 +31854,7 @@
 	req_access_txt = "37"
 	},
 /turf/simulated/floor,
-/area/station/security/armory)
+/area/station/ai_monitored/armory)
 "buu" = (
 /obj/cable{
 	icon_state = "2-4";
@@ -31871,7 +31867,7 @@
 	d2 = 8
 	},
 /turf/simulated/floor,
-/area/station/security/armory)
+/area/station/ai_monitored/armory)
 "buv" = (
 /obj/cable{
 	icon_state = "4-8";
@@ -31879,7 +31875,7 @@
 	d2 = 8
 	},
 /turf/simulated/floor,
-/area/station/security/armory)
+/area/station/ai_monitored/armory)
 "buw" = (
 /obj/cable{
 	icon_state = "4-8";
@@ -31891,7 +31887,7 @@
 	d2 = 2
 	},
 /turf/simulated/floor,
-/area/station/security/armory)
+/area/station/ai_monitored/armory)
 "bux" = (
 /obj/cable{
 	icon_state = "4-8";
@@ -31899,7 +31895,7 @@
 	d2 = 8
 	},
 /turf/simulated/floor/caution/east,
-/area/station/security/armory)
+/area/station/ai_monitored/armory)
 "buy" = (
 /obj/machinery/door/poddoor{
 	density = 0;
@@ -31916,7 +31912,7 @@
 	req_access_txt = "37"
 	},
 /turf/simulated/floor,
-/area/station/security/armory)
+/area/station/ai_monitored/armory)
 "buz" = (
 /obj/machinery/light/small{
 	dir = 1
@@ -31927,7 +31923,7 @@
 	d2 = 8
 	},
 /turf/simulated/floor,
-/area/station/security/armory)
+/area/station/ai_monitored/armory)
 "buA" = (
 /obj/machinery/door/poddoor{
 	density = 0;
@@ -31949,7 +31945,7 @@
 	req_access_txt = "37"
 	},
 /turf/simulated/floor,
-/area/station/security/armory)
+/area/station/ai_monitored/armory)
 "buB" = (
 /obj/cable{
 	icon_state = "2-8";
@@ -32101,18 +32097,18 @@
 /obj/machinery/recharger,
 /obj/cable,
 /turf/simulated/floor,
-/area/station/security/armory)
+/area/station/ai_monitored/armory)
 "buR" = (
 /obj/table/auto,
 /turf/simulated/floor,
-/area/station/security/armory)
+/area/station/ai_monitored/armory)
 "buS" = (
 /obj/table/auto,
 /obj/machinery/recharger,
 /obj/machinery/light,
 /obj/cable,
 /turf/simulated/floor,
-/area/station/security/armory)
+/area/station/ai_monitored/armory)
 "buT" = (
 /obj/cable{
 	d1 = 1;
@@ -32124,7 +32120,7 @@
 	dir = 4
 	},
 /turf/simulated/floor,
-/area/station/security/armory)
+/area/station/ai_monitored/armory)
 "buU" = (
 /obj/cable{
 	icon_state = "4-8";
@@ -32136,7 +32132,7 @@
 	pixel_y = 0
 	},
 /turf/simulated/floor/caution/east,
-/area/station/security/armory)
+/area/station/ai_monitored/armory)
 "buV" = (
 /obj/machinery/door/poddoor{
 	density = 0;
@@ -32157,7 +32153,7 @@
 	req_access_txt = "37"
 	},
 /turf/simulated/floor,
-/area/station/security/armory)
+/area/station/ai_monitored/armory)
 "buW" = (
 /obj/cable{
 	icon_state = "4-8";
@@ -32169,7 +32165,7 @@
 	pixel_y = 0
 	},
 /turf/simulated/floor,
-/area/station/security/armory)
+/area/station/ai_monitored/armory)
 "buX" = (
 /obj/machinery/door/poddoor{
 	density = 0;
@@ -32195,7 +32191,7 @@
 	req_access_txt = "37"
 	},
 /turf/simulated/floor,
-/area/station/security/armory)
+/area/station/ai_monitored/armory)
 "buY" = (
 /obj/cable{
 	icon_state = "1-2";
@@ -32571,20 +32567,20 @@
 	},
 /area/station/security/prison)
 "bvM" = (
-/turf/simulated/wall/asteroid{
+/turf/simulated/wall/auto/asteroid{
 	dir = 1;
 	icon_state = "ast1"
 	},
 /area/space)
 "bvN" = (
-/turf/simulated/wall/asteroid{
+/turf/simulated/wall/auto/asteroid{
 	dir = 1;
 	icon_state = "ast1"
 	},
 /area/syndicate_station)
 "bvO" = (
 /turf/space,
-/turf/simulated/wall/asteroid{
+/turf/simulated/wall/auto/asteroid{
 	dir = 1;
 	icon_state = "ast1"
 	},
@@ -32601,13 +32597,13 @@
 /area/syndicate_station)
 "bvQ" = (
 /turf/space,
-/turf/simulated/wall/asteroid{
+/turf/simulated/wall/auto/asteroid{
 	dir = 1;
 	icon_state = "ast1"
 	},
 /area/space)
 "bvR" = (
-/turf/simulated/wall/asteroid{
+/turf/simulated/wall/auto/asteroid{
 	dir = 5;
 	icon_state = "ast1"
 	},
@@ -32703,13 +32699,13 @@
 	},
 /area/space)
 "bwd" = (
-/turf/simulated/wall/asteroid{
+/turf/simulated/wall/auto/asteroid{
 	dir = 10;
 	icon_state = "ast1"
 	},
 /area/space)
 "bwe" = (
-/turf/simulated/wall/asteroid,
+/turf/simulated/wall/auto/asteroid,
 /area/syndicate_station)
 "bwf" = (
 /obj/grille/steel,
@@ -32926,7 +32922,7 @@
 /turf/space,
 /area/syndicate_station)
 "bwz" = (
-/turf/simulated/wall/asteroid{
+/turf/simulated/wall/auto/asteroid{
 	dir = 10;
 	icon_state = "ast1"
 	},
@@ -32942,7 +32938,7 @@
 	},
 /area/space)
 "bwC" = (
-/turf/simulated/wall/asteroid{
+/turf/simulated/wall/auto/asteroid{
 	dir = 4;
 	icon_state = "ast1"
 	},
@@ -33052,7 +33048,7 @@
 /area/syndicate_station)
 "bwN" = (
 /turf/simulated/floor/plating/airless/asteroid,
-/turf/simulated/wall/asteroid{
+/turf/simulated/wall/auto/asteroid{
 	dir = 10;
 	icon_state = "ast1"
 	},
@@ -33206,7 +33202,7 @@
 /turf/space,
 /area/syndicate_station)
 "bxf" = (
-/turf/simulated/wall/asteroid{
+/turf/simulated/wall/auto/asteroid{
 	dir = 8;
 	icon_state = "ast1"
 	},
@@ -33274,7 +33270,7 @@
 /area/syndicate_station)
 "bxm" = (
 /turf/space,
-/turf/simulated/wall/asteroid{
+/turf/simulated/wall/auto/asteroid{
 	dir = 5;
 	icon_state = "ast1"
 	},
@@ -33493,7 +33489,7 @@
 /area/station/security/prison)
 "bxC" = (
 /turf/simulated/floor/plating/airless/asteroid,
-/turf/simulated/wall/asteroid{
+/turf/simulated/wall/auto/asteroid{
 	dir = 9;
 	icon_state = "ast1"
 	},
@@ -33737,13 +33733,13 @@
 /area/station/security/prison)
 "bxZ" = (
 /turf/space,
-/turf/simulated/wall/asteroid{
+/turf/simulated/wall/auto/asteroid{
 	dir = 8;
 	icon_state = "ast1"
 	},
 /area/space)
 "bya" = (
-/turf/simulated/wall/asteroid{
+/turf/simulated/wall/auto/asteroid{
 	dir = 6;
 	icon_state = "ast1"
 	},
@@ -33786,7 +33782,7 @@
 /area/syndicate_station)
 "byf" = (
 /turf/space,
-/turf/simulated/wall/asteroid{
+/turf/simulated/wall/auto/asteroid{
 	dir = 4;
 	icon_state = "ast1"
 	},
@@ -33889,14 +33885,14 @@
 /area/station/security/prison)
 "byr" = (
 /turf/space,
-/turf/simulated/wall/asteroid{
+/turf/simulated/wall/auto/asteroid{
 	dir = 10;
 	icon_state = "ast1"
 	},
 /area/syndicate_station)
 "bys" = (
 /turf/simulated/floor/plating/airless/asteroid,
-/turf/simulated/wall/asteroid{
+/turf/simulated/wall/auto/asteroid{
 	dir = 5;
 	icon_state = "ast1"
 	},
@@ -34004,14 +34000,14 @@
 /area/space)
 "byF" = (
 /turf/simulated/floor/plating/airless/asteroid,
-/turf/simulated/wall/asteroid{
+/turf/simulated/wall/auto/asteroid{
 	dir = 1;
 	icon_state = "ast1"
 	},
 /area/syndicate_station)
 "byG" = (
 /turf/simulated/floor/plating/airless,
-/turf/simulated/wall/asteroid{
+/turf/simulated/wall/auto/asteroid{
 	dir = 10;
 	icon_state = "ast1"
 	},
@@ -34682,9 +34678,7 @@
 	},
 /area/station/security/hos)
 "bAg" = (
-/turf/space{
-	icon_state = "aplaceholder"
-	},
+/turf/space/asteroid,
 /area/syndicate_station)
 "bAh" = (
 /turf/simulated/floor{
@@ -34811,21 +34805,21 @@
 /area/space)
 "bAr" = (
 /turf/space,
-/turf/simulated/wall/asteroid{
+/turf/simulated/wall/auto/asteroid{
 	dir = 10;
 	icon_state = "ast1"
 	},
 /area/space)
 "bAs" = (
 /turf/space,
-/turf/simulated/wall/asteroid{
+/turf/simulated/wall/auto/asteroid{
 	dir = 6;
 	icon_state = "ast1"
 	},
 /area/space)
 "bAt" = (
 /turf/space,
-/turf/simulated/wall/asteroid{
+/turf/simulated/wall/auto/asteroid{
 	icon_state = "ast1"
 	},
 /area/space)

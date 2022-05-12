@@ -2,9 +2,9 @@
 
 TYPEINFO(/datum/component/glued)
 	initialization_args = list(
-		ARG_INFO("target", "ref", "What is this glued to", null),
-		ARG_INFO("glue_duration", "num", "How long the glue lasts, null for infinity", null),
-		ARG_INFO("glue_removal_time", "num", "How long does it take to unglue stuff", null),
+		ARG_INFO("target", DATA_INPUT_REF, "What is this glued to", null),
+		ARG_INFO("glue_duration", DATA_INPUT_NUM, "How long the glue lasts, null for infinity", null),
+		ARG_INFO("glue_removal_time", DATA_INPUT_NUM, "How long does it take to unglue stuff", null),
 	)
 
 /datum/component/glued
@@ -48,7 +48,7 @@ TYPEINFO(/datum/component/glued)
 	else
 		parent.plane = PLANE_UNDERFLOOR
 	parent.vis_flags |= VIS_INHERIT_PLANE | VIS_INHERIT_LAYER
-	RegisterSignal(parent, COMSIG_ATTACKHAND, .proc/start_ungluing)
+	RegisterSignal(parent, COMSIG_ATTACKHAND, .proc/on_attackhand)
 	RegisterSignal(parent, COMSIG_ATTACKBY, .proc/pass_on_attackby)
 	RegisterSignal(parent, COMSIG_MOVABLE_BLOCK_MOVE, .proc/move_blocked_check)
 	RegisterSignal(parent, COMSIG_MOVABLE_SET_LOC, .proc/on_set_loc)
@@ -71,6 +71,13 @@ TYPEINFO(/datum/component/glued)
 	var/turf/T = get_turf(parent)
 	T.visible_message("<span class='notice'>The glue on [parent] dries up and it falls off from [glued_to].</span>")
 	qdel(src)
+
+/datum/component/glued/proc/on_attackhand(atom/movable/parent, mob/user)
+	if(user?.a_intent == INTENT_HELP)
+		src.start_ungluing(parent, user)
+	else
+		src.glued_to.Attackhand(user)
+		user.lastattacked = user
 
 /datum/component/glued/proc/start_ungluing(atom/movable/parent, mob/user)
 	if(isnull(src.glue_removal_time))

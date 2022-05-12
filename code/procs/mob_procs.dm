@@ -94,7 +94,11 @@
 	if (!I)
 		return 0
 	if (!src.put_in_hand(I))
+		#ifdef UPSCALED_MAP
+		I.set_loc(get_turf(src))
+		#else
 		I.set_loc(get_turf(I))
+		#endif
 		return 1
 	return 1
 
@@ -129,6 +133,8 @@
 
 	if (movedelay < slip_delay)
 		var/intensity = (-0.33)+(6.033763-(-0.33))/(1+(movement_delay_real/(0.4))-1.975308)  //y=d+(6.033763-d)/(1+(x/c)-1.975308)
+		if (traitHolder && traitHolder.hasTrait("super_slips"))
+			intensity = max(intensity, 12) //the 12 is copied from the range of lube slips because that's what I'm trying to emulate
 		var/throw_range = min(round(intensity),50)
 		if (intensity < 1 && intensity > 0 && throw_range <= 0)
 			throw_range = max(throw_range,1)
@@ -229,11 +235,13 @@
 
 // We've had like 10+ code snippets for a variation of the same thing, now it's just one mob proc (Convair880).
 /mob/living/apply_flash(var/animation_duration = 30, var/weak = 8, var/stun = 0, var/misstep = 0, var/eyes_blurry = 0, var/eyes_damage = 0, var/eye_tempblind = 0, var/burn = 0, var/uncloak_prob = 50, var/stamina_damage = 130,var/disorient_time = 60)
-	if (!src || !isliving(src) || isintangible(src) || istype(src, /mob/living/object))
+	if (isintangible(src) || islivingobject(src))
 		return
 	if (animation_duration <= 0)
 		return
 
+	if (check_target_immunity(src))
+		return 0
 	// Target checks.
 	var/mod_animation = 0 // Note: these aren't multipliers.
 	var/mod_weak = 0
@@ -371,7 +379,7 @@
 // Similar concept to apply_flash(). One proc in place of a bunch of individually implemented code snippets (Convair880).
 #define DO_NOTHING (!weak && !stun && !misstep && !slow && !drop_item && !ears_damage && !ear_tempdeaf)
 /mob/living/apply_sonic_stun(var/weak = 0, var/stun = 8, var/misstep = 0, var/slow = 0, var/drop_item = 0, var/ears_damage = 0, var/ear_tempdeaf = 0, var/stamina_damage = 130)
-	if (!src || !isliving(src) || isintangible(src) || istype(src, /mob/living/object))
+	if (isintangible(src) || islivingobject(src))
 		return
 	if (DO_NOTHING)
 		return
@@ -749,7 +757,7 @@
 	var/datum/gang/gang_to_see = null
 	var/PWT_to_see = null
 
-	if (isadminghost(src) || src.client?.adventure_view)
+	if (isadminghost(src) || src.client?.adventure_view || current_state >= GAME_STATE_FINISHED)
 		see_everything = 1
 	else
 		if (istype(ticker.mode, /datum/game_mode/revolution))

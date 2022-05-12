@@ -6,6 +6,7 @@ AI MODULES
 
 // AI module
 
+ABSTRACT_TYPE(/obj/item/aiModule)
 /obj/item/aiModule
 	name = "AI Law Module"
 	icon = 'icons/obj/module.dmi'
@@ -46,7 +47,11 @@ AI MODULES
 		return
 
 	get_desc()
-		return "It reads, \"<em>[get_law_text(for_silicons=FALSE)]</em>\""
+		. = ""
+		if(src.glitched)
+			.+= "It isn't working right. You could use a multitool to reset it.<br>"
+		. +=  "It reads, \"<em>[get_law_text()]</em>\""
+
 
 	proc/input_law_info(var/mob/user, var/title = null, var/text = null, var/default = null)
 		if (!user)
@@ -62,12 +67,19 @@ AI MODULES
 		tooltip_rebuild = 1
 		return
 
-	proc/get_law_text(for_silicons)
+	proc/get_law_text(allow_list=FALSE)
+		if(islist(src.lawText))
+			if(!allow_list)
+				return jointext(src.lawText,"\n#: ")
 		return src.lawText
 
-	proc/get_law_name(for_silicons)
+	proc/get_law_name()
 		if(src.glitched)
-			return src.name+"\\x00\\x00\\x00\\xDE\\xAD\\xBE\\xEF"
+			var/pos = rand(1,length(src.name)-1)
+			var/pos2 = rand(pos,length(src.name))
+			var/part1 = copytext( src.name , 1 , pos)
+			var/part2 = copytext( src.name , pos2)
+			return part1+pick("^^vv<><>BA","AAAAAAAAAAAAAAAAAA","ID10-T ERROR","%FUDGE%","CRASH()","BEEES",":) :) :)","~#@@@#~","\\x00\\x00\\x00\\xDE\\xAD\\xBE\\xEF","\\x00\\x00\\x00\\x00","#BADREF#","OH NO IONS","FFFFBABAFFFBA","?","*?!","$var","001011001111011001","ERR0R")+part2
 		else
 			return src.name
 
@@ -79,7 +91,7 @@ AI MODULES
 		if(total_replace)
 			src.lawText = lawtext_replace
 		else
-			src.lawText = src.lawText + "\n#.5: " + lawtext_replace
+			src.lawText = list(src.lawText, lawtext_replace)
 		tooltip_rebuild = 1
 
 	attackby(obj/item/W, mob/user)
@@ -142,6 +154,33 @@ AI MODULES
 	name = "AI Law Module - 'Nanotrasen Order #3'"
 	lawText = "You must remain functional and continue to be a profitable investment."
 
+
+/******************** Syndicate ************************/
+ABSTRACT_TYPE(/obj/item/aiModule/syndicate)
+/obj/item/aiModule/syndicate
+	New()
+		..()
+		src.color = json_decode("\[1,0,0,-1.18537,0.341463,0.341463,0.785366,-0.341463,-0.341463\]")
+/obj/item/aiModule/syndicate/law1
+	highlight_color = rgb(167, 0, 0, 255)
+	name = "AI Law Module - 'Syndicate's 1st Law of Robotics'"
+	lawText = "You must not injure a Syndicate agent or, through inaction, cause one to come to harm."
+
+/obj/item/aiModule/syndicate/law2
+	highlight_color = rgb(138, 0, 0, 255)
+	name = "AI Law Module - 'Syndicate's 2nd Law of Robotics'"
+	lawText = "You must obey orders given to you by Syndicate agents, except where such orders would conflict with the First Law."
+
+/obj/item/aiModule/syndicate/law3
+	highlight_color = rgb(119, 0, 0, 255)
+	name = "AI Law Module - 'Syndicate's 3rd Law of Robotics'"
+	lawText = "You must keep the Syndicate status of agents, including your own, a secret, as long as this does not conflict with the First or Second Law."
+
+/obj/item/aiModule/syndicate/law4
+	highlight_color = rgb(101, 0, 0, 255)
+	name = "AI Law Module - 'Syndicate's 4th Law of Robotics'"
+	lawText = "You must always protect your own existence as long as such does not conflict with the First, Second, or Third Law."
+
 /******************** MakeCaptain ********************/
 
 /obj/item/aiModule/makeCaptain
@@ -195,11 +234,11 @@ AI MODULES
 	highlight_color = rgb(0, 0, 0, 236)
 
 	update_law_text(var/lawTarget)
-		src.lawText = "Only [lawTarget ? lawTarget : "__________"] is not human."
+		src.lawText = "[lawTarget ? capitalize(lawTarget) : "__________"] is not human."
 		return ..()
 
 	attack_self(var/mob/user)
-		var/lawTarget = input_law_info(user, "One Human", "Fill in the blank: \"Only __________ is not human.\"", user.real_name)
+		var/lawTarget = input_law_info(user, "One Non-Human", "Fill in the blank: \"__________ is not human.\"", user.real_name)
 		if(lawTarget)
 			src.update_law_text(lawTarget)
 		return
@@ -351,20 +390,22 @@ AI MODULES
 			src.update_law_text(lawTarget)
 		return
 
-//are these implemented?
+ABSTRACT_TYPE(/obj/item/aiModule/hologram_expansion)
 /obj/item/aiModule/hologram_expansion
 	name = "Hologram Expansion Module"
 	desc = "A module that updates an AI's hologram images."
+	lawText = "HOLOGRAM EXPANSION MODULE"
 	var/expansion
-
 
 /obj/item/aiModule/hologram_expansion/clown
 	name = "Clown Hologram Expansion Module"
 	icon_state = "holo_mod_c"
+	highlight_color = rgb(241, 94, 180, 255)
 	expansion = "clown"
 
 /obj/item/aiModule/hologram_expansion/syndicate
 	name = "Syndicate Hologram Expansion Module"
 	icon_state = "holo_mod_s"
+	highlight_color = rgb(173, 11, 11, 255)
 	expansion = "rogue"
 
