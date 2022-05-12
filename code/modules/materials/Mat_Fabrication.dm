@@ -178,7 +178,7 @@
 		var/html = list()
 		html += "<a href=\"?src=\ref[src];tab=recipes\"><i class=\"icon-list\"></i> Blueprints</a>  "
 		html += "<a href=\"?src=\ref[src];tab=storage\"><i class=\"icon-folder-open\"></i> Storage</a>  "
-		html += "<a href=\"?src=\ref[src];tab=progress\"><i class=\"icon-cog\"></i> Progress</a>  "
+		html += "<a href=\"?src=\ref[src];tab=rockbox\"><i class=\"icon-cog\"></i> Rockbox</a>  "
 		html += "<a href=\"?src=\ref[src];tab=settings\"><i class=\"icon-wrench\"></i> Settings</a>"
 		html += "<hr>"
 
@@ -214,10 +214,8 @@
 					html += "<br>"
 					html += " [R.desc]<br><br>"
 				html +=  "</div>"
-			if("progress")
-				html += "Current production queue:<br><br>"
-				for(var/X in queue)
-					html += "[X]<br>" // The queue doesn't exist yet so this doesn't do anything :/
+			if("rockbox")// stole the queue tab and am using it for rockbox
+
 			if("storage")
 				var/count = 0
 				for(var/obj/item/I in src)
