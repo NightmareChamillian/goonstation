@@ -95,9 +95,12 @@
 
 	var/output_target = null
 
-	var/obj/item/card/id/scan = null // these three are important for rockbox interaction
+	var/obj/item/card/id/scan = null
 	var/temp = null
+	var/list/dat = list()
 	var/net_id = null
+
+
 
 	New()
 		for(var/R in blueprints)
@@ -105,6 +108,10 @@
 		src.net_id = generate_net_id(src)
 		START_TRACKING
 		..()
+
+	disposing()
+		. = ..()
+		STOP_TRACKING
 
 	attack_hand(mob/user as mob)
 		user.Browse(buildHtml(), "window=nfab;size=550x650;title=Nano-fabricator;fade_in=0;can_resize=0", 1)
@@ -214,7 +221,27 @@
 					html += "<br>"
 					html += " [R.desc]<br><br>"
 				html +=  "</div>"
-			if("rockbox")// stole the queue tab and am using it for rockbox
+			if("rockbox")
+				html +="<B>Scanned Card:</B> <A href='?src=\ref[src];card=1'>([src.scan])</A><BR>"
+				if(scan)
+					var/datum/db_record/account = null
+					account = FindBankAccountByName(src.scan.registered)
+					if (account)
+						html+="<B>Current Funds</B>: [account["current_money"]] Credits<br>"
+				html+= src.temp
+				html += "<HR><B><h3>Ores Available for Purchase:</h3></B><small>"
+				for_by_tcl(S, /obj/machinery/ore_cloud_storage_container)
+					if(S.broken)
+						continue
+					html += "<h3><B>[S.name] at [get_area(S)]:</B><br></h3>"
+					var/list/ores = S.ores
+					for(var/ore in ores)
+						var/datum/ore_cloud_data/OCD = ores[ore]
+						if(!OCD.for_sale || !OCD.amount)
+							continue
+						var/taxes = round(max(rockbox_globals.rockbox_client_fee_min,abs(OCD.price*rockbox_globals.rockbox_client_fee_pct/100)),0.01) //transaction taxes for the station budget
+						html += "<h4>[ore]: [OCD.amount] ($[OCD.price+taxes+(!rockbox_globals.rockbox_premium_purchased ? rockbox_globals.rockbox_standard_fee : 0)]/ore) (<A href='?src=\ref[src];purchase=1;storage=\ref[S];ore=[ore]'>Purchase</A>)</h4><br>"
+
 
 			if("storage")
 				var/count = 0
@@ -365,6 +392,10 @@
 				return
 		*/
 		return
+
+	ex_act(severity)
+		return
+
 
 	proc/scan_card(var/obj/item/I) // procs- from manufacturer/rockbox
 		if (istype(I, /obj/item/device/pda2))
