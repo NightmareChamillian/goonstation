@@ -185,7 +185,7 @@
 		var/html = list()
 		html += "<a href=\"?src=\ref[src];tab=recipes\"><i class=\"icon-list\"></i> Blueprints</a>  "
 		html += "<a href=\"?src=\ref[src];tab=storage\"><i class=\"icon-folder-open\"></i> Storage</a>  "
-		html += "<a href=\"?src=\ref[src];tab=rockbox\"><i class=\"icon-cog\"></i> Rockbox</a>  "
+		html += "<a href=\"?src=\ref[src];tab=progress\"><i class=\"icon-cog\"></i> Progress</a>  "
 		html += "<a href=\"?src=\ref[src];tab=settings\"><i class=\"icon-wrench\"></i> Settings</a>"
 		html += "<hr>"
 
@@ -221,8 +221,8 @@
 					html += "<br>"
 					html += " [R.desc]<br><br>"
 				html +=  "</div>"
-			if("rockbox")
-				html +="<B>Scanned Card:</B> <A href='?src=\ref[src];card=1'>([src.scan])</A><BR>"
+			if("progress")
+				/*html +="<B>Scanned Card:</B> <A href='?src=\ref[src];card=1'>([src.scan])</A><BR>"
 				if(scan)
 					var/datum/db_record/account = null
 					account = FindBankAccountByName(src.scan.registered)
@@ -241,7 +241,8 @@
 							continue
 						var/taxes = round(max(rockbox_globals.rockbox_client_fee_min,abs(OCD.price*rockbox_globals.rockbox_client_fee_pct/100)),0.01) //transaction taxes for the station budget
 						html += "<h4>[ore]: [OCD.amount] ($[OCD.price+taxes+(!rockbox_globals.rockbox_premium_purchased ? rockbox_globals.rockbox_standard_fee : 0)]/ore) (<A href='?src=\ref[src];purchase=1;storage=\ref[S];ore=[ore]'>Purchase</A>)</h4><br>"
-
+				html +=  "</div>"*/
+				html+= "FUCK YOU"
 
 			if("storage")
 				var/count = 0
