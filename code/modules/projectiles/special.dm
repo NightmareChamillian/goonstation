@@ -244,6 +244,7 @@ ABSTRACT_TYPE(/datum/projectile/special)
 	sname = "fragments"
 	cost = 1
 	pellets_to_fire = 4
+	casing = /obj/item/casing/shotgun/pipe
 	spread_projectile_type = /datum/projectile/bullet/improvplasglass
 	shot_sound = 'sound/weapons/shotgunshot.ogg'
 	speed_max = 40

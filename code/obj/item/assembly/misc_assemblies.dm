@@ -888,9 +888,10 @@ obj/item/assembly/radio_horn/receive_signal()
 
 	attackby(obj/item/W, mob/user)
 		if (!recipe) //no recipie? assign one
+		//((craftingitem.material == getMaterial("plasmaglass")) && (craftingitem.material.getProperty("hard") >= 7))
 			if (istype(W, /obj/item/raw_material/shard))
 				if(W.material.getProperty("hard") >= 7)
-					recipe = new/datum/pipeshotrecipe/glass
+					recipe = new/datum/pipeshotrecipe/plasglass
 				else
 					recipe = new/datum/pipeshotrecipe/glass
 					desc = "Four open pipe shells, with propellant in them. It's got some shards of glass in it." //only update description if we need to
@@ -928,7 +929,7 @@ obj/item/assembly/radio_horn/receive_signal()
 	result = /obj/item/ammo/bullets/pipeshot/plasglass
 	accepteditem = /obj/item/raw_material/shard
 
-	craftwith(obj/item/craftingitem, obj/item/frame, mob/user)//(craftingitem.material == getMaterial("plasmaglass")) && (
+	craftwith(obj/item/craftingitem, obj/item/frame, mob/user)//
 		if (craftingitem.material.getProperty("hard") >= 7)// unhappy about overriding for this one statement but that's how it is
 			//since we're overriding we may as well cut out extraneous code
 			var/obj/item/ammo/bullets/shot = new src.result(get_turf(frame))

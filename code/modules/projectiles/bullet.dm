@@ -636,9 +636,10 @@ toxic - poisons
 	icon_state = "plasglass"
 	dissipation_delay = 3
 	dissipation_rate = 2
-	damage_type = D_PIERCING //hee hoo
-	implanted = /obj/item/implant/projectile/shrapnel
-	power = 7
+	damage_type = D_PIERCING //hee hee
+	armor_ignored = 0.66 //hoo hoo
+	implanted = null
+	power = 6
 
 /datum/projectile/bullet/improvglass
 	name = "glass fragments"
