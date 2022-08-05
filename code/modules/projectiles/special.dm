@@ -237,6 +237,17 @@ ABSTRACT_TYPE(/datum/projectile/special)
 	spread_angle_variance = 10
 	dissipation_variance = 10
 
+/datum/projectile/special/spreader/buckshot_burst/plasglass
+	name = "fragments"
+	sname = "fragments"
+	cost = 1
+	pellets_to_fire = 4
+	spread_projectile_type = /datum/projectile/bullet/improvplasglass
+	shot_sound = 'sound/weapons/shotgunshot.ogg'
+	speed_max = 40
+	speed_min = 34
+	spread_angle_variance = 15
+	dissipation_variance = 10
 
 /datum/projectile/special/spreader/buckshot_burst/nails
 	name = "nails"

@@ -679,6 +679,7 @@
 	sound_load = 'sound/weapons/gunload_heavy.ogg'
 
 ABSTRACT_TYPE(/obj/item/ammo/bullets/pipeshot)
+//Pipeshot, by NightmarechaMillian. Handmade shotgun shells meant to be used in slamguns
 /obj/item/ammo/bullets/pipeshot
 	sname = "pipeshot"
 	name = "pipeshot"
@@ -691,6 +692,12 @@ ABSTRACT_TYPE(/obj/item/ammo/bullets/pipeshot)
 	delete_on_reload = TRUE
 	sound_load = 'sound/weapons/gunload_heavy.ogg'
 	w_class = W_CLASS_NORMAL
+
+/obj/item/ammo/bullets/pipeshot/plasglass // glass handmade shells
+	sname = "plasmaglass load"
+	desc = "Some mean-looking plasmaglass shards that are jammed into a few cut open pipe frames."
+	ammo_type = new/datum/projectile/special/spreader/buckshot_burst/plasglass
+	icon_state = "makeshiftplasglass"
 
 /obj/item/ammo/bullets/pipeshot/glass // glass handmade shells
 	sname = "glass load"

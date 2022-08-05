@@ -629,10 +629,20 @@ toxic - poisons
 	damage_type = D_SLASHING
 	casing = /obj/item/casing/shotgun/gray
 
-//for makeshift shotgun shells
+//for makeshift shotgun shells- don't use these, use the spreader projectile found in special.dm
+/datum/projectile/bullet/improvplasglass
+	name = "plasmaglass fragments"
+	sname = "plasmaglass fragments"
+	icon_state = "plasglass"
+	dissipation_delay = 3
+	dissipation_rate = 2
+	damage_type = D_PIERCING //hee hoo
+	implanted = /obj/item/implant/projectile/shrapnel
+	power = 7
+
 /datum/projectile/bullet/improvglass
-	name = "glass"
-	sname = "glass"
+	name = "glass fragments"
+	sname = "glass fragments"
 	icon_state = "glass"
 	dissipation_delay = 2
 	dissipation_rate = 2
