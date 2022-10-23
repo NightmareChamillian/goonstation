@@ -692,6 +692,38 @@ toxic - poisons
 	implanted = /obj/item/implant/projectile/shrapnel
 	power = 8
 
+
+/datum/projectile/special/spreader/buckshot_burst/glass/explode //
+	spread_angle_variance = 360
+
+/datum/projectile/bullet/scrapshotbulb
+	name = "lightbulb"
+	icon_state = "lightbulb"
+	power = 8
+	dissipation_delay = 3
+	dissipation_rate = 2
+	damage_type = D_KINETIC
+	hit_type = DAMAGE_BLUNT
+	shot_sound = 'sound/weapons/shotgunshot.ogg'
+	casing = /obj/item/casing/shotgun/pipe
+	projectile_speed = 40
+
+
+
+	//shoot_projectile_ST(src, /datum/projectile/special/spreader/buckshot_burst/glass/explode, get_turf(src))
+	//var/datum/projectile/special/spreader/buckshot_burst/glass/explode/PJ = new /datum/projectile/special/spreader/buckshot_burst/glass/explode(get_turf(src))
+	//var/turf/newtarget = get_turf(src)
+	//shoot_projectile_ST_pixel_spread(src, PJ, get_turf(src), 0, 0, projectile_spread)
+
+	on_hit(atom/hit)
+		elecflash(get_turf(hit),0, power=2, exclude_center = 0)
+		explosion_new(null, get_turf(hit), 0.5)
+
+	on_max_range_die(obj/projectile/O)
+		elecflash(get_turf(O),0, power=2, exclude_center = 0)
+		explosion_new(null, get_turf(O), 0.5)
+
+
 /datum/projectile/bullet/aex
 	name = "explosive slug"
 	shot_sound = 'sound/weapons/shotgunshot.ogg'

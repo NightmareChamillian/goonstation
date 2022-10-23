@@ -764,6 +764,13 @@ ABSTRACT_TYPE(/obj/item/ammo/bullets/pipeshot)
 	amount_left = 5
 	max_amount = 5
 
+/obj/item/ammo/bullets/pipeshot/bulb // scrap handmade shells
+	sname = "lightbulb"
+	desc = "A... lightbulb? that's been stuffed into a pipe frame."
+	ammo_type = new/datum/projectile/bullet/scrapshotbulb
+	icon_state = "makeshiftbulb"
+
+
 
 /obj/item/ammo/bullets/nails // oh god oh fuck
 	sname = "Nails"

@@ -913,6 +913,12 @@ obj/item/assembly/radio_horn/receive_signal()
 		if(matid == craftingitem.material.mat_id)
 			..() //call parent, have them run the typecheck
 
+/datum/pipeshotrecipe/lightbulb
+	thingsneeded = 4
+	result = /obj/item/ammo/bullets/pipeshot/bulb
+	accepteditem = /obj/item/light //for now
+	craftname = "lightbulb"
+
 /datum/pipeshotrecipe/scrap
 	thingsneeded = 1
 	result = /obj/item/ammo/bullets/pipeshot/scrap/
@@ -939,6 +945,9 @@ obj/item/assembly/radio_horn/receive_signal()
 					recipe = new/datum/pipeshotrecipe/glass
 			if (istype(W, /obj/item/raw_material/scrap_metal))
 				recipe = new/datum/pipeshotrecipe/scrap
+			if (istype(W, /obj/item/light))
+				recipe = new/datum/pipeshotrecipe/lightbulb
+
 		if(recipe) //probably a better way, but it works well enough
 			recipe.craftwith(W, src, user)
 		..()
