@@ -8,17 +8,20 @@
 #define FLOCK_PROCESS_SCHEDULE_INTERVAL 2 SECONDS
 
 //annotation name macros
-#define FLOCK_ANNOTATION_HAZARD "hazard"
 #define FLOCK_ANNOTATION_DECONSTRUCT "deconstruct"
+#define FLOCK_ANNOTATION_HAZARD "hazard"
 #define FLOCK_ANNOTATION_PRIORITY "priority"
 #define FLOCK_ANNOTATION_RESERVED "reserved"
 #define FLOCK_ANNOTATION_FLOCKMIND_CONTROL "flockmind_face"
 #define FLOCK_ANNOTATION_FLOCKTRACE_CONTROL "flocktrace_face"
 #define FLOCK_ANNOTATION_HEALTH "health"
 
+// flock intangibles
+#define FLOCK_AFK_COUNTER_THRESHOLD 180 SECONDS
+
 // costs
 #define FLOCK_CONVERT_COST 20
-#define FLOCK_BARRICADE_COST 25
+#define FLOCK_BARRICADE_COST 20
 #define FLOCK_LAY_EGG_COST 100
 #define FLOCK_REPAIR_COST 10
 #define FLOCK_GHOST_DEPOSIT_AMOUNT 10
@@ -29,7 +32,18 @@
 #define FLOCK_ACHIEVEMENT_CHEAT_STRUCTURES "all_structures"
 #define FLOCK_ACHIEVEMENT_CHEAT_COMPUTE "infinite_compute"
 #define FLOCK_ACHIEVEMENT_CAGE_HUMAN "human_dissection"
+#define FLOCK_ACHIEVEMENT_BULLETS_HIT "bullets_hit"
+
+#define FLOCK_BULLETS_HIT_THRESHOLD 15
 
 // replication defs
 #define FLOCK_MIN_DESIRED_POP 10
 #define FLOCK_ADDITIONAL_RESOURCE_RESERVATION_PER_DRONE 7.5
+
+// drone compute configs
+#define FLOCK_DRONE_COMPUTE 10
+#define FLOCK_DRONE_COMPUTE_HIBERNATE 15
+// how many times a drone must wander in a row before it hibernates
+#define FLOCK_DRONE_WANDER_PAUSE_COUNT 5
+// maximum number of flockdrones allowed
+#define FLOCK_DRONE_LIMIT 75

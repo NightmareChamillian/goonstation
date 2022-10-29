@@ -574,7 +574,7 @@
 			boutput(holder.owner, "Clearing active turret target.")
 		else if(!isdead(M) && (iscarbon(M) || !ismobcritter(M)))
 			expansion.turret.target = M
-			logTheThing("combat", holder.owner, target, "[key_name(holder.owner)] used <b>[src.name]</b> on [key_name(target)] [log_loc(holder.owner)].")
+			logTheThing(LOG_COMBAT, holder.owner, "[key_name(holder.owner)] used <b>[src.name]</b> on [key_name(target)] [log_loc(holder.owner)].")
 
 			boutput(holder.owner, "Deployable turret now targeting: [M.name].")
 		else
@@ -589,7 +589,7 @@
 		var/obj/item/aiModule/ability_expansion/friend_turret/expansion = get_law_module()
 		expansion.turret.lasers = !expansion.turret.lasers
 		var/mode = expansion.turret.lasers ? "LETHAL" : "STUN"
-		logTheThing("combat", holder.owner, null, "[key_name(holder.owner)] set deployable turret to [mode].")
+		logTheThing(LOG_COMBAT, holder.owner, "[key_name(holder.owner)] set deployable turret to [mode].")
 		boutput(holder.owner, "Turret now set to [mode].")
 		expansion.turret.power_change()
 
@@ -704,3 +704,43 @@
 			nodes -= T
 
 	return nodes
+
+/datum/mutex
+	var/locked
+
+	proc/unlock()
+		locked = FALSE
+
+	proc/lock()
+		while(!trylock())
+			sleep(1)
+
+	proc/trylock()
+		if(!locked)
+			locked = TRUE
+			. = TRUE
+
+	limited
+		var/iterations
+		var/maxIterations
+
+		New(maxItrs)
+			..()
+			maxIterations = maxItrs
+
+		trylock()
+			if(iterations <= 0 && locked)
+				locked = FALSE
+			. = ..()
+			if(.)
+				iterations = maxIterations
+			else
+				iterations--
+
+		unlock()
+			iterations = 0
+			..()
+
+
+
+

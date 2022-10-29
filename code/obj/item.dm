@@ -38,15 +38,14 @@
 	var/force = 0
 	var/hit_type = DAMAGE_BLUNT // for bleeding system things, options: DAMAGE_BLUNT, DAMAGE_CUT, DAMAGE_STAB in order of how much it affects the chances to increase bleeding
 	throwforce = 1
-	var/r_speed = 1.0
+	var/r_speed = 1
 	var/hitsound = 'sound/impact_sounds/Generic_Hit_1.ogg'
 	var/stamina_damage = STAMINA_ITEM_DMG //amount of stamina removed from target per hit.
 	var/stamina_cost = STAMINA_ITEM_COST  //amount of stamina removed from USER per hit. This cant bring you below 10 points and you will not be able to attack if it would.
 
 	var/stamina_crit_chance = STAMINA_CRIT_CHANCE //Crit chance when attacking with this.
 	var/datum/item_special/special = null // Contains the datum which executes the items special, if it has one, when used beyond melee range.
-	var/hide_attack = 0 //If 1, hide the attack animation + particles. Used for hiding attacks with silenced .22 and sleepy pen
-						//If 2, play the attack animation but hide the attack particles.
+	var/hide_attack = ATTACK_VISIBLE
 	var/click_delay = DEFAULT_CLICK_DELAY //Delay before next click after using this.
 	var/combat_click_delay = COMBAT_CLICK_DELAY
 
@@ -124,6 +123,7 @@
 	var/rarity = ITEM_RARITY_COMMON // Just a little thing to indicate item rarity. RPG fluff.
 	pressure_resistance = 50
 	var/obj/item/master = null
+	var/acid_survival_time //nadir support: set in minutes to override how long item will stay intact in contact with acid
 
 	var/tmp/last_tick_duration = 1 // amount of time spent between previous tick and this one (1 = normal)
 	var/tmp/last_processing_tick = -1
@@ -141,7 +141,7 @@
 		. = list()
 		if(showTooltipDesc)
 			. += capitalize(src.desc)
-			var/extra = src.get_desc(get_dist(src, usr), usr)
+			var/extra = src.get_desc(GET_DIST(src, usr), usr)
 			if(extra)
 				. += "<br>" + extra
 
@@ -212,7 +212,7 @@
 			if (!lastTooltipContent || !lastTooltipTitle || tooltip_flags & REBUILD_ALWAYS\
 			 || (HAS_ATOM_PROPERTY(usr, PROP_MOB_SPECTRO) && tooltip_flags & REBUILD_SPECTRO)\
 			 || (usr != lastTooltipUser && tooltip_flags & REBUILD_USER)\
-			 || (get_dist(src, usr) != lastTooltipDist && tooltip_flags & REBUILD_DIST))
+			 || (GET_DIST(src, usr) != lastTooltipDist && tooltip_flags & REBUILD_DIST))
 				tooltip_rebuild = 1
 
 			//If user has tooltips to always show, and the item is in world, and alt key is NOT pressed, deny
@@ -261,7 +261,7 @@
 		..()
 		tooltip_rebuild = 1
 		if (istype(src.material))
-			burn_possible = src.material.getProperty("flammable") >= 5 ? TRUE : FALSE
+			burn_possible = src.material.getProperty("flammable") >= 1 ? TRUE : FALSE
 			if (src.material.material_flags & MATERIAL_METAL || src.material.material_flags & MATERIAL_CRYSTAL || src.material.material_flags & MATERIAL_RUBBER)
 				burn_type = 1
 			else
@@ -302,16 +302,9 @@
 			// this is a gross hack to make things not just show "1" by default
 			src.inventory_counter.update_number(src.amount)
 
-	src.set_health()
-	..()
-
-/obj/item/proc/set_health()
 	if (isnull(initial(src.health))) // if not overridden
-		switch (src.w_class)
-			if (W_CLASS_TINY to W_CLASS_NORMAL)
-				src.health = src.w_class + 1
-			else
-				src.health = src.w_class + 2
+		src.health = get_initial_item_health(src.type)
+	..()
 
 /obj/item/set_loc(var/newloc as turf|mob|obj in world)
 	if (src.temp_flags & IS_LIMB_ITEM)
@@ -372,14 +365,16 @@
 
 
 //disgusting proc. merge with foods later. PLEASE
-/obj/item/proc/Eat(var/mob/M as mob, var/mob/user)
+/obj/item/proc/Eat(var/mob/M as mob, var/mob/user, var/by_matter_eater=FALSE)
 	if (!iscarbon(M) && !ismobcritter(M))
 		return 0
 	if (M?.bioHolder && !M.bioHolder.HasEffect("mattereater"))
 		if(ON_COOLDOWN(M, "eat", EAT_COOLDOWN))
 			return 0
-	var/edibility_override = SEND_SIGNAL(M, COMSIG_ITEM_CONSUMED_PRE, user, src)
-	if (!src.edible && !(src.material && src.material.edible) && !(edibility_override & FORCE_EDIBILITY))
+	var/edibility_override = SEND_SIGNAL(M, COMSIG_MOB_ITEM_CONSUMED_PRE, user, src) || SEND_SIGNAL(src, COMSIG_ITEM_CONSUMED_PRE, M, user)
+	var/can_matter_eat = by_matter_eater && (M == user) && M.bioHolder.HasEffect("mattereater")
+	var/edible_check = src.edible || (src.material?.edible) || (edibility_override & FORCE_EDIBILITY)
+	if (!edible_check && !can_matter_eat)
 		return 0
 
 	if (M == user)
@@ -394,12 +389,13 @@
 			SPAWN(0.5 SECONDS) // Necessary.
 				src.reagents.trans_to(M, src.reagents.total_volume/src.amount)
 
-		playsound(M.loc,"sound/items/eatfood.ogg", rand(10, 50), 1)
+		playsound(M.loc,'sound/items/eatfood.ogg', rand(10, 50), 1)
 		eat_twitch(M)
-		SPAWN(1 SECOND)
+		SPAWN(0.6 SECOND)
 			if (!src || !M || !user)
 				return
-			SEND_SIGNAL(M, COMSIG_ITEM_CONSUMED, user, src)
+			SEND_SIGNAL(M, COMSIG_MOB_ITEM_CONSUMED, user, src) //one to the mob
+			SEND_SIGNAL(src, COMSIG_ITEM_CONSUMED, M, src) //one to the item
 			user.u_equip(src)
 			qdel(src)
 		return 1
@@ -408,7 +404,7 @@
 		user.tri_message(M, "<span class='alert'><b>[user]</b> tries to feed [M] [src]!</span>",\
 			"<span class='alert'>You try to feed [M] [src]!</span>",\
 			"<span class='alert'><b>[user]</b> tries to feed you [src]!</span>")
-		logTheThing("combat", user, M, "attempts to feed [constructTarget(M,"combat")] [src] [log_reagents(src)]")
+		logTheThing(LOG_COMBAT, user, "attempts to feed [constructTarget(M,"combat")] [src] [log_reagents(src)]")
 
 		if (!do_mob(user, M))
 			return 0
@@ -418,7 +414,7 @@
 		user.tri_message(M, "<span class='alert'><b>[user]</b> feeds [M] [src]!</span>",\
 			"<span class='alert'>You feed [M] [src]!</span>",\
 			"<span class='alert'><b>[user]</b> feeds you [src]!</span>")
-		logTheThing("combat", user, M, "feeds [constructTarget(M,"combat")] [src] [log_reagents(src)]")
+		logTheThing(LOG_COMBAT, user, "feeds [constructTarget(M,"combat")] [src] [log_reagents(src)]")
 
 		if (src.material && src.material.edible)
 			src.material.triggerEat(M, src)
@@ -428,12 +424,13 @@
 			SPAWN(0.5 SECONDS) // Necessary.
 				src.reagents.trans_to(M, src.reagents.total_volume)
 
-		playsound(M.loc, "sound/items/eatfood.ogg", rand(10, 50), 1)
+		playsound(M.loc, 'sound/items/eatfood.ogg', rand(10, 50), 1)
 		eat_twitch(M)
 		SPAWN(1 SECOND)
 			if (!src || !M || !user)
 				return
-			SEND_SIGNAL(M, COMSIG_ITEM_CONSUMED, user, src)
+			SEND_SIGNAL(M, COMSIG_MOB_ITEM_CONSUMED, user, src) //one to the mob
+			SEND_SIGNAL(src, COMSIG_ITEM_CONSUMED, M, src) //one to the item
 			user.u_equip(src)
 			qdel(src)
 		return 1
@@ -471,7 +468,7 @@
 				if (W?.firesource)
 					msg += " by item ([W]). Last touched by: [key_name(W.fingerprintslast)]"
 				message_admins(msg)
-				logTheThing("bombing", W?.fingerprintslast, null, msg)
+				logTheThing(LOG_BOMBING, W?.fingerprintslast, msg)
 	if (src.burn_output >= 1000)
 		UpdateOverlays(image('icons/effects/fire.dmi', "2old"),"burn_overlay")
 	else
@@ -558,8 +555,13 @@
 
 /obj/item/proc/stack_item(obj/item/other)
 	var/added = 0
-	if(isrobot(other.loc))
-		max_stack = 500
+	var/imrobot
+	var/imdrone
+	if((imrobot = isrobot(other.loc)) || (imdrone = isghostdrone(other.loc)) || istype(other.loc, /obj/item/magtractor))
+		if (imrobot)
+			max_stack = 500
+		else if (imdrone)
+			max_stack = 1000
 		if (other != src && check_valid_stack(src))
 			if (src.amount + other.amount > max_stack)
 				added = max_stack - other.amount
@@ -651,7 +653,7 @@
 	if (!src.anchored)
 		click_drag_tk(over_object, src_location, over_location, over_control, params)
 
-	if (usr.stat || usr.restrained() || !can_reach(usr, src) || usr.getStatusDuration("paralysis") || usr.sleeping || usr.lying || isAIeye(usr) || isAI(usr) || isrobot(usr) || isghostcritter(usr) || (over_object && over_object.event_handler_flags & NO_MOUSEDROP_QOL))
+	if (usr.stat || usr.restrained() || !can_reach(usr, src) || usr.getStatusDuration("paralysis") || usr.sleeping || usr.lying || isAIeye(usr) || isAI(usr) || isrobot(usr) || isghostcritter(usr) || (over_object && over_object.event_handler_flags & NO_MOUSEDROP_QOL) || isintangible(usr))
 		return
 
 	var/on_turf = isturf(src.loc)
@@ -709,16 +711,16 @@
 			if (W.weak_tk && !IN_RANGE(src, W, 2))
 				src.throw_at(over_object, 1, 1)
 				boutput(W, "<span class='alert'>You're too far away to properly manipulate this physical item!</span>")
-				logTheThing("combat", usr, null, "moves [src] with wtk.")
+				logTheThing(LOG_COMBAT, usr, "moves [src] [dir2text(get_dir(usr, over_object))] with wtk.")
 				return
 			src.throw_at(over_object, 7, 1)
-			logTheThing("combat", usr, null, "throws [src] with wtk.")
+			logTheThing(LOG_COMBAT, usr, "throws [src] [dir2text(get_dir(usr, over_object))] with wtk.")
 		else if (ismegakrampus(usr))
 			src.throw_at(over_object, 7, 1)
-			logTheThing("combat", usr, null, "throws [src] with k_tk.")
-		else if(usr.bioHolder && usr.bioHolder.HasEffect("telekinesis_drag") && isturf(src.loc) && isalive(usr) && usr.canmove && get_dist(src,usr) <= 7 && !src.anchored && src.w_class < W_CLASS_GIGANTIC)
+			logTheThing(LOG_COMBAT, usr, "throws [src] [dir2text(get_dir(usr, over_object))] with k_tk.")
+		else if(usr.bioHolder && usr.bioHolder.HasEffect("telekinesis_drag") && isturf(src.loc) && isalive(usr) && usr.canmove && GET_DIST(src,usr) <= 7 && !src.anchored && src.w_class < W_CLASS_GIGANTIC)
 			src.throw_at(over_object, 7, 1)
-			logTheThing("combat", usr, null, "throws [src] with tk.")
+			logTheThing(LOG_COMBAT, usr, "throws [src] [dir2text(get_dir(usr, over_object))] with tk.")
 
 #ifdef HALLOWEEN
 		else if (istype(usr, /mob/dead/observer))	//ghost
@@ -729,7 +731,7 @@
 				var/datum/abilityHolder/ghost_observer/GH = usr:abilityHolder
 				if (GH.spooking)
 					src.throw_at(over_object, 7-I.w_class, 1)
-					logTheThing("combat", usr, null, "throws [src] with g_tk.")
+					logTheThing(LOG_COMBAT, usr, "throws [src] with g_tk.")
 #endif
 
 //equip an item, given an inventory hud object or storage item UI thing
@@ -829,9 +831,9 @@
 			S.hud.objects -= src // prevents invisible object from failed transfer (item doesn't fit in pockets from backpack for example)
 
 /obj/item/attackby(obj/item/W, mob/user, params)
-	if(src.material)
-		src.material.triggerTemp(src ,1500)
 	if (W.firesource)
+		if(src.material)
+			src.material.triggerTemp(src ,1500)
 		if (src.burn_possible && src.burn_point <= 1500)
 			src.combust(W)
 		else
@@ -945,19 +947,7 @@
 	src.equipped_in_slot = slot
 	for(var/datum/objectProperty/equipment/prop in src.properties)
 		prop.onEquipped(src, user, src.properties[prop])
-	var/datum/movement_modifier/equipment/equipment_proxy = locate() in user.movement_modifiers
-	if (!equipment_proxy)
-		equipment_proxy = new
-		APPLY_MOVEMENT_MODIFIER(user, equipment_proxy, /obj/item)
-	equipment_proxy.additive_slowdown += src.getProperty("movespeed")
-	var/fluidmove = src.getProperty("negate_fluid_speed_penalty")
-	if (fluidmove)
-		equipment_proxy.additive_slowdown += fluidmove // compatibility hack for old code treating space & fluid movement capability as a slowdown
-		equipment_proxy.aquatic_movement += fluidmove
-	var/spacemove = src.getProperty("space_movespeed")
-	if (spacemove)
-		equipment_proxy.additive_slowdown += spacemove // compatibility hack for old code treating space & fluid movement capability as a slowdown
-		equipment_proxy.space_movement += spacemove
+	user.update_equipped_modifiers()
 
 /obj/item/proc/unequipped(var/mob/user)
 	SHOULD_CALL_PARENT(1)
@@ -969,19 +959,7 @@
 	for(var/datum/objectProperty/equipment/prop in src.properties)
 		prop.onUnequipped(src, user, src.properties[prop])
 	src.equipped_in_slot = null
-	var/datum/movement_modifier/equipment/equipment_proxy = locate() in user.movement_modifiers
-	if (!equipment_proxy)
-		equipment_proxy = new
-		APPLY_MOVEMENT_MODIFIER(user, equipment_proxy, /obj/item)
-	equipment_proxy.additive_slowdown -= src.getProperty("movespeed")
-	var/fluidmove = src.getProperty("negate_fluid_speed_penalty")
-	if (fluidmove)
-		equipment_proxy.additive_slowdown -= fluidmove
-		equipment_proxy.aquatic_movement -= fluidmove
-	var/spacemove = src.getProperty("space_movespeed")
-	if (spacemove)
-		equipment_proxy.additive_slowdown -= spacemove
-		equipment_proxy.space_movement -= spacemove
+	user.update_equipped_modifiers()
 
 /obj/item/proc/AfterAttack(atom/target, mob/user, reach, params)
 	SHOULD_NOT_OVERRIDE(TRUE)
@@ -1000,7 +978,7 @@
 
 /obj/item/ex_act(severity)
 	switch(severity)
-		if (2.0)
+		if (2)
 			if (src.material)
 				src.material.triggerTemp(src ,7500)
 			if (src.burn_possible && !src.burning && src.burn_point <= 7500)
@@ -1009,7 +987,7 @@
 				if (!src.ArtifactSanityCheck()) return
 				src.ArtifactStimulus("force", 75)
 				src.ArtifactStimulus("heat", 450)
-		if (3.0)
+		if (3)
 			if (src.material)
 				src.material.triggerTemp(src, 3500)
 			if (src.burn_possible && !src.burning && src.burn_point <= 3500)
@@ -1169,7 +1147,7 @@
 		if (src.ArtifactSanityCheck())
 			src.ArtifactTouched(user)
 
-	if (hide_attack != 1)
+	if (hide_attack != ATTACK_FULLY_HIDDEN)
 		if (pickup_sfx)
 			playsound(oldloc_sfx, pickup_sfx, 56, vary=0.2)
 		else
@@ -1191,7 +1169,7 @@
 		return
 
 	if (src.flags & SUPPRESSATTACK)
-		logTheThing("combat", user, M, "uses [src] ([type], object name: [initial(name)]) on [constructTarget(M,"combat")]")
+		logTheThing(LOG_COMBAT, user, "uses [src] ([type], object name: [initial(name)]) on [constructTarget(M,"combat")]")
 		return
 
 	if (user.mind && user.mind.special_role == ROLE_VAMPTHRALL && isvampire(M) && user.is_mentally_dominated_by(M))
@@ -1200,7 +1178,7 @@
 
 	if(user.traitHolder && !user.traitHolder.hasTrait("glasscannon"))
 		if (!user.process_stamina(src.stamina_cost))
-			logTheThing("combat", user, M, "tries to attack [constructTarget(M,"combat")] with [src] ([type], object name: [initial(name)]) but is out of stamina")
+			logTheThing(LOG_COMBAT, user, "tries to attack [constructTarget(M,"combat")] with [src] ([type], object name: [initial(name)]) but is out of stamina")
 			return
 
 	if (chokehold)
@@ -1216,7 +1194,7 @@
 	var/d_zone = affecting
 
 	if (!M.melee_attack_test(user, src, d_zone))
-		logTheThing("combat", user, M, "attacks [constructTarget(M,"combat")] with [src] ([type], object name: [initial(name)]) but the attack is blocked!")
+		logTheThing(LOG_COMBAT, user, "attacks [constructTarget(M,"combat")] with [src] ([type], object name: [initial(name)]) but the attack is blocked!")
 		return
 
 	if(hasProperty("frenzy"))
@@ -1434,9 +1412,9 @@
 		if (O == (attacher || attachee))
 			continue
 		if (attacher == attachee)
-			O.show_message("<span class='alert'>[attacher] attaches [src] to \his own stump!</span>", 1)
+			O.show_message("<span class='alert'>[attacher] attaches [src] to [his_or_her(attacher)] own stump!</span>", 1)
 		else
-			O.show_message("<span class='alert'>[attachee] has [src] attached to \his stump by [attacher].</span>", 1)
+			O.show_message("<span class='alert'>[attachee] has [src] attached to [his_or_her(attachee)] stump by [attacher].</span>", 1)
 
 	if (attachee != attacher)
 		boutput(attachee, "<span class='alert'>[attacher] attaches [src] to your stump. It doesn't look very secure!</span>")
@@ -1578,7 +1556,7 @@
 		var/obj/item/W = locate(/obj/item) in T.contents
 		if (istype(W.material, /datum/material/crystal/plasmastone))
 			msg += " Turf contains <b>plasmastone</b>."
-	logTheThing("bombing", M, null, "[msg]")
+	logTheThing(LOG_BOMBING, M, "[msg]")
 
 /obj/item/proc/dropped(mob/user)
 	SPAWN(0) //need to spawn to know if we've been dropped or thrown instead
