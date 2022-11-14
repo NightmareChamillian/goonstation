@@ -707,6 +707,8 @@ toxic - poisons
 	shot_sound = 'sound/weapons/shotgunshot.ogg'
 	casing = /obj/item/casing/shotgun/pipe
 	projectile_speed = 40
+	var/custom_projectile_type = /datum/projectile/bullet/improvglass
+	var/pellets_to_fire = 9
 
 
 
@@ -715,11 +717,21 @@ toxic - poisons
 	//var/turf/newtarget = get_turf(src)
 	//shoot_projectile_ST_pixel_spread(src, PJ, get_turf(src), 0, 0, projectile_spread)
 
-	on_hit(atom/hit)
+	on_hit(atom/hit, direction, obj/projectile/p)
 		elecflash(get_turf(hit),0, power=2, exclude_center = 0)
 		explosion_new(null, get_turf(hit), 0.5)
-		var/datum/projectile/special/spreader/buckshot_burst/glass/explode/proj = new /datum/projectile/special/spreader/buckshot_burst/glass/explode(get_turf(src))
-		shoot_projectile_ST(get_turf(hit), proj, get_turf(hit))
+		//var/datum/projectile/special/spreader/buckshot_burst/glass/explode/proj = new /datum/projectile/special/spreader/buckshot_burst/glass/explode(get_turf(src))
+		//shoot_projectile_ST(get_turf(hit), proj, get_turf(hit))
+		//
+		var/datum/projectile/special/spreader/uniform_burst/circle/PJ = new /datum/projectile/special/spreader/uniform_burst/circle(get_turf(p))
+
+		PJ.spread_projectile_type = /datum/projectile/bullet/improvglass
+		PJ.pellet_shot_volume = 75 / PJ.pellets_to_fire //anti-ear destruction
+		PJ.pellets_to_fire = src.pellets_to_fire
+		var/targetx = p.x - rand(-5,5)
+		var/targety = p.y - rand(-5,5)
+		var/turf/newtarget = locate(targetx, targety, p.z)
+		shoot_projectile_ST(p, PJ, newtarget)
 
 	on_max_range_die(obj/projectile/O)
 		elecflash(get_turf(O),0, power=2, exclude_center = 0)

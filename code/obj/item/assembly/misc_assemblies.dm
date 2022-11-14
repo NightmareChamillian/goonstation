@@ -916,8 +916,12 @@ obj/item/assembly/radio_horn/receive_signal()
 /datum/pipeshotrecipe/lightbulb
 	thingsneeded = 4
 	result = /obj/item/ammo/bullets/pipeshot/bulb
-	accepteditem = /obj/item/light //for now
+	accepteditem = /obj/item/light/bulb
 	craftname = "lightbulb"
+
+	craftwith(obj/item/light/craftingitem, obj/item/frame, mob/user)
+		if(craftingitem.rigged) //similar to plasglass, run our check, then call parent and run theirs
+			..()
 
 /datum/pipeshotrecipe/scrap
 	thingsneeded = 1
