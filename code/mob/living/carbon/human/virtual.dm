@@ -9,10 +9,13 @@
 		..()
 		sound_burp = 'sound/voice/virtual_gassy.ogg'
 		//sound_malescream = 'sound/voice/virtual_scream.ogg'
-		sound_scream = 'sound/voice/virtual_scream.ogg'
-		sound_fart = 'sound/voice/virtual_gassy.ogg'
+		src.bioHolder.mobAppearance.screamsounds["virtual"] = 'sound/voice/virtual_scream.ogg'
+		src.bioHolder.mobAppearance.screamsound = "virtual"
+		src.bioHolder.mobAppearance.fartsounds["virtual"] = 'sound/voice/virtual_gassy.ogg'
+		src.bioHolder.mobAppearance.fartsound = "virtual"
 		sound_snap = 'sound/voice/virtual_snap.ogg'
 		sound_fingersnap = 'sound/voice/virtual_snap.ogg'
+		src.sims = null
 		SPAWN(0)
 			src.set_mutantrace(/datum/mutantrace/virtual)
 
@@ -26,7 +29,7 @@
 		if (!escape_vr)
 			var/area/A = get_area(src)
 			if ((T && !(T.z == 2)) || (A && !A.virtual))
-				boutput(src, "<span class='alert'>Is this virtual?  Is this real?? <b>YOUR MIND CANNOT TAKE THIS METAPHYSICAL CALAMITY</b></span>")
+				boutput(src, SPAN_ALERT("Is this virtual?  Is this real?? <b>YOUR MIND CANNOT TAKE THIS METAPHYSICAL CALAMITY</b>"))
 				src.gib()
 				return
 
@@ -37,10 +40,6 @@
 		return
 
 	death(gibbed)
-		for (var/atom/movable/a in contents)
-			if (a.flags & ISADVENTURE)
-				a.set_loc(get_turf(src))
-
 		Station_VNet.Leave_Vspace(src)
 
 		. = ..()
@@ -61,11 +60,11 @@
 			src.death()
 		return
 
-	say(var/message) //Handle Virtual Spectres
+	say(var/message, var/ignore_stamina_winded = FALSE, var/unique_maptext_style, var/maptext_animation_colors)
 		if(!isghost)
 			return ..()
 
-		message = trim(copytext(sanitize(message), 1, MAX_MESSAGE_LEN))
+		message = trimtext(copytext(sanitize(message), 1, MAX_MESSAGE_LEN))
 		if (!message)
 			return
 
@@ -119,7 +118,8 @@
 	targeted = 0
 	target_anything = 0
 	interrupt_action_bars = 0
-	dont_lock_holder = 1
+	lock_holder = FALSE
+	do_logs = FALSE
 
 	//castcheck()
 		//if (!holder)
@@ -127,6 +127,7 @@
 
 	cast()
 		// Won't delete the VR character otherwise, which can be confusing (detective's goggles sending you to the existing body in the bomb VR etc).
+		. = ..()
 		var/mob/M = holder.owner
 		setdead(M)
 		M.death(FALSE)

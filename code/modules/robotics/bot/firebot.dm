@@ -13,11 +13,10 @@
 	desc = "A little fire-fighting robot!  He looks so darn chipper."
 	icon = 'icons/obj/bots/aibots.dmi'
 	icon_state = "firebot0"
-	event_handler_flags = USE_PROXIMITY | USE_FLUID_ENTER
-	flags =  FPRINT | FLUID_SUBMERGE | TGUI_INTERACTIVE | DOORPASS
+	flags =  FLUID_SUBMERGE | TGUI_INTERACTIVE | DOORPASS
 	layer = 5.0 //TODO LAYER
 	density = 0
-	anchored = 0
+	anchored = UNANCHORED
 	req_access = list(access_engineering_atmos)
 	on = 1
 	health = 20
@@ -35,6 +34,7 @@
 	var/extinguish_flags = EXTINGUISH_HOTSPOTS | EXTINGUISH_ITEMS | EXTINGUISH_MOBS
 	var/water_amt = 2
 	var/foam_amt = 8
+	var/list/people_to_ignore = list() //people we've insulted with the trait and don't need to insult again
 	//To-Do: Patrol the station for fires maybe??
 
 /obj/machinery/bot/firebot/party
@@ -62,6 +62,7 @@
 	SPAWN(0.5 SECONDS)
 		if (src)
 			src.icon_state = "firebot[src.on]"
+			src.AddComponent(/datum/component/proximity)
 
 //		if(radio_connection)
 //			radio_controller.add_object(src, "[beacon_freq]")
@@ -116,8 +117,8 @@
 /obj/machinery/bot/firebot/emag_act(var/mob/user, var/obj/item/card/emag/E)
 	if (!src.emagged)
 		if(user)
-			boutput(user, "<span class='alert'>You short out [src]'s valve control circuit!</span>")
-		src.audible_message("<span class='alert'><B>[src] buzzes oddly!</B></span>")
+			boutput(user, SPAN_ALERT("You short out [src]'s valve control circuit!"))
+		src.audible_message(SPAN_ALERT("<B>[src] buzzes oddly!</B>"))
 		flick("firebot_spark", src)
 		src.KillPathAndGiveUp(1)
 		src.emagged = 1
@@ -139,7 +140,7 @@
 /obj/machinery/bot/firebot/emp_act()
 	..()
 	if (!src.emagged && prob(75))
-		src.visible_message("<span class='alert'><B>[src] buzzes oddly!</B></span>")
+		src.visible_message(SPAN_ALERT("<B>[src] buzzes oddly!</B>"))
 		flick("firebot_spark", src)
 		src.KillPathAndGiveUp(1)
 		src.emagged = 1
@@ -154,20 +155,18 @@
 		//Swedenfact:
 		//"Fart" means "speed", so if a policeman pulls you over with the words "fartkontroll" you should not pull your pants down
 		return
-	if (istype(W, /obj/item/device/pda2) && W:ID_card)
-		W = W:ID_card
-	if (istype(W, /obj/item/card/id))
+	if (istype(get_id_card(W), /obj/item/card/id))
 		if (src.allowed(user))
 			src.locked = !src.locked
 			boutput(user, "Controls are now [src.locked ? "locked." : "unlocked."]")
 			src.updateUsrDialog()
 		else
-			boutput(user, "<span class='alert'>Access denied.</span>")
+			boutput(user, SPAN_ALERT("Access denied."))
 
 	else if (isscrewingtool(W))
 		if (src.health < initial(src.health))
 			src.health = initial(src.health)
-			src.visible_message("<span class='notice'>[user] repairs [src]!</span>", "<span class='notice'>You repair [src].</span>")
+			src.visible_message(SPAN_NOTICE("[user] repairs [src]!"), SPAN_NOTICE("You repair [src]."))
 	else
 		switch(W.hit_type)
 			if (DAMAGE_BURN)
@@ -222,7 +221,7 @@
 		ON_COOLDOWN(src, FIREBOT_SEARCH_COOLDOWN, src.found_cooldown)
 		src.frustration = 0
 		src.doing_something = 1
-		if(IN_RANGE(src,src.target,3))
+		if(reachable_in_n_steps(get_turf(src), get_turf(src.target), 3, use_gas_cross=TRUE))
 			spray_at(src.target)
 		else
 			src.navigate_to(get_turf(src.target), FIREBOT_MOVE_SPEED, max_dist = 30)
@@ -258,8 +257,14 @@
 
 	if(src.extinguish_flags & EXTINGUISH_MOBS)
 		for (var/mob/M in by_cat[TR_CAT_BURNING_MOBS]) // fine I guess we can go extinguish someone
-			if (M == src.oldtarget || isdead(M) || !src.valid_target(M))
+			if (M == src.oldtarget || isdead(M) || !src.valid_target(M) || (get_weakref(M) in src.people_to_ignore))
 				continue
+			if(M.traitHolder.hasTrait("wasitsomethingisaid"))
+				src.people_to_ignore.Add(get_weakref(M)) //each bot gets to insult the person once
+				src.point(M, 1)
+				src.speak(pick("I WILL IGNORE THAT BECAUSE I DO NOT LIKE YOU.", "SOME BOTS JUST WANT TO WATCH CERTAIN PEOPLE BURN TO DEATH","I CAN MAKE AN EXCEPTION JUST THIS ONCE, FIRE.","AND NOW THAT THE WORLD IS ON FIRE YOU HAVE THE AUDACITY TO COME TO ME FOR HELP?", "MY HATRED FOR YOU OUTWEIGHS MY FEELINGS ON FIRE WHICH ARE PUBLICLY KNOWN TO BE QUITE STRONG"))
+				continue
+
 			if(IN_RANGE(src, M, 7) && (M.getStatusDuration("burning") || (src.emagged && prob(25))))
 				if (src.setup_party)
 					src.speak(pick("YOU NEED TO GET DOWN -- ON THE DANCE FLOOR", "PARTY HARDER", "HAPPY BIRTHDAY.", "YOU ARE NOT PARTYING SUFFICIENTLY.", "NOW CORRECTING PARTY DEFICIENCY."))
@@ -270,7 +275,7 @@
 
 /obj/machinery/bot/firebot/DoWhileMoving()
 	. = ..()
-	if (IN_RANGE(src, src.target, 3) && !ON_COOLDOWN(src, FIREBOT_SPRAY_COOLDOWN, src.spray_cooldown))
+	if (IN_RANGE(src, src.target, 3) && !ON_COOLDOWN(src, FIREBOT_SPRAY_COOLDOWN, src.spray_cooldown) && reachable_in_n_steps(get_turf(src), get_turf(src.target), 3, use_gas_cross=TRUE))
 		src.frustration = 0
 		spray_at(src.target)
 		return TRUE
@@ -284,7 +289,7 @@
 		ON_COOLDOWN(src, FIREBOT_SEARCH_COOLDOWN, src.found_cooldown)
 
 //Oh no, we may or may not be emagged! Better hope someone crossing us is on fire!
-/obj/machinery/bot/firebot/HasProximity(atom/movable/AM as mob|obj)
+/obj/machinery/bot/firebot/EnteredProximity(atom/movable/AM)
 	if(!on || stunned)
 		return
 
@@ -330,8 +335,8 @@
 		var/atom/targetTurf = get_edge_target_turf(target, get_dir(src, get_step_away(target, src)))
 
 		var/mob/living/carbon/Ctarget = target
-		boutput(Ctarget, "<span class='alert'><b>[src] knocks you back!</b></span>")
-		Ctarget.changeStatus("weakened", 2 SECONDS)
+		boutput(Ctarget, SPAN_ALERT("<b>[src] knocks you back!</b>"))
+		Ctarget.changeStatus("knockdown", 2 SECONDS)
 		Ctarget.throw_at(targetTurf, 200, 4)
 
 	if (iscarbon(src.target)) //Check if this is a mob and we can stop spraying when they are no longer on fire.
@@ -371,7 +376,7 @@
 	if(src.exploding) return
 	src.exploding = 1
 	src.on = 0
-	src.visible_message("<span class='alert'><B>[src] blows apart!</B></span>", 1)
+	src.visible_message(SPAN_ALERT("<B>[src] blows apart!</B>"))
 	playsound(src.loc, 'sound/impact_sounds/Machinery_Break_1.ogg', 40, 1)
 	var/turf/Tsec = get_turf(src)
 
@@ -383,7 +388,7 @@
 		new /obj/item/parts/robot_parts/arm/left/standard(Tsec)
 
 	var/obj/item/storage/toolbox/emergency/emptybox = new /obj/item/storage/toolbox/emergency(Tsec)
-	for(var/obj/item/I in emptybox.contents) //Empty the toolbox so we don't have infinite crowbars or whatever
+	for(var/obj/item/I in emptybox.storage.get_contents()) //Empty the toolbox so we don't have infinite crowbars or whatever
 		qdel(I)
 
 	elecflash(src, radius=1, power=3, exclude_center = 0)
@@ -412,6 +417,7 @@
 	extinguish_flags = EXTINGUISH_MOBS
 	water_amt = 0
 	foam_amt = 10
+	health = 100 //thicc
 
 /obj/machinery/bot/firebot/firebrand/valid_target(mob/M)
 	return istype(M.get_id(), /obj/item/card/id/syndicate)
@@ -425,8 +431,8 @@
 		..()
 		return
 
-	if(src.contents.len >= 1)
-		boutput(user, "<span class='alert'>You need to empty [src] out first!</span>")
+	if(length(src.contents) >= 1)
+		boutput(user, SPAN_ALERT("You need to empty [src] out first!"))
 		return
 
 	var/obj/item/toolbox_arm/B = new /obj/item/toolbox_arm

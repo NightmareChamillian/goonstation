@@ -8,30 +8,33 @@ Contains:
 
 //////////////////////////////////////// Laser tripwire //////////////////////////////
 
+TYPEINFO(/obj/item/device/infra)
+	mats = 3
+
 /obj/item/device/infra
 	name = "Laser Tripwire"
 	desc = "Emits a visible or invisible beam and is triggered when the beam is interrupted."
 	icon_state = "infrared0"
-	var/obj/beam/i_beam/first = null
 	var/state = 0
 	var/visible = 0
-	flags = FPRINT | TABLEPASS| CONDUCT
+	flags = TABLEPASS | CONDUCT
 	w_class = W_CLASS_SMALL
 	item_state = "electronic"
 	m_amt = 150
-	mats = 3
 
 ///////////////////////////////////////// Infrared sensor ///////////////////////////////////////////
+
+TYPEINFO(/obj/item/device/infra_sensor)
+	mats = 4
 
 /obj/item/device/infra_sensor
 	name = "Infrared Sensor"
 	desc = "Scans for infrared beams in the vicinity."
 	icon_state = "infra_sensor"
 	var/passive = 1
-	flags = FPRINT | TABLEPASS| CONDUCT
+	flags = TABLEPASS | CONDUCT
 	item_state = "electronic"
 	m_amt = 150
-	mats = 4
 
 /* When/if someone ever gets around to fixing these uncomment this
 /obj/item/device/infra_sensor/process()
@@ -242,7 +245,7 @@ Contains:
 	var/obj/item/device/radio/signaler/part1 = null
 	var/obj/item/device/infra/part2 = null
 	status = null
-	flags = FPRINT | TABLEPASS | CONDUCT
+	flags = TABLEPASS | CONDUCT
 
 /obj/item/assembly/rad_infra/c_state(n)
 	src.icon_state = text("infrared-radio[]", n)
@@ -273,9 +276,9 @@ Contains:
 		return
 	src.status = !(src.status)
 	if (src.status)
-		user.show_message("<span class='notice'>The infrared laser is now secured!</span>", 1)
+		user.show_message(SPAN_NOTICE("The infrared laser is now secured!"), 1)
 	else
-		user.show_message("<span class='notice'>The infrared laser is now unsecured!</span>", 1)
+		user.show_message(SPAN_NOTICE("The infrared laser is now unsecured!"), 1)
 	src.part1.b_stat = !(src.status)
 	src.add_fingerprint(user)
 	return

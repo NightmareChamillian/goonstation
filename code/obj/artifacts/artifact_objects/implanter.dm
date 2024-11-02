@@ -9,7 +9,7 @@
 	validtypes = list("eldritch", "ancient", "wizard")
 	validtriggers = list(/datum/artifact_trigger/force,/datum/artifact_trigger/electric,/datum/artifact_trigger/heat,
 	/datum/artifact_trigger/radiation,/datum/artifact_trigger/carbon_touch,/datum/artifact_trigger/silicon_touch,
-	/datum/artifact_trigger/cold)
+	/datum/artifact_trigger/cold, /datum/artifact_trigger/language)
 	fault_blacklist = list(ITEM_ONLY_FAULTS)
 	activ_text = "opens up, revealing a complex array of thin tubes!"
 	deact_text = "closes itself up."
@@ -53,14 +53,12 @@
 				var/wizardImp = pick(/obj/item/implant/artifact/wizard/wizard_good, /obj/item/implant/artifact/wizard/wizard_gimmick, /obj/item/implant/artifact/wizard/wizard_bad)
 				imp = new wizardImp
 
-		H.implant.Add(imp)
-		imp.set_loc(H)
 		imp.implanted(H, H)
 
 		O.ArtifactFaultUsed(H)
 
 		var/turf/T = get_turf(O)
-		playsound(T, 'sound/machines/click.ogg', 90, 1)
+		playsound(T, 'sound/machines/click.ogg', 90, TRUE)
 		T.visible_message("<b>[O]</b> shoots a small object into [H]!")
 
 		ready = FALSE

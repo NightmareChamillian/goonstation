@@ -1,8 +1,6 @@
 
 /turf/var/obj/fluid/active_airborne_liquid = null
 
-var/list/ban_from_airborne_fluid = list()
-
 /datum/fluid_group/airborne
 
 	base_evaporation_time = 30 SECONDS
@@ -22,14 +20,12 @@ var/list/ban_from_airborne_fluid = list()
 // This is messy as fuck, but its the fastest solution i could think of CPU wise
 
 /obj/fluid/airborne
-	name = "cloud"
+	name = "vapor"
 	desc = "It's a free-flowing airborne state of matter!"
 	icon_state = "airborne"
 	do_iconstate_updates = 0
-	mouse_opacity = 1
 	opacity = 0
 	layer = FLUID_AIR_LAYER
-	flags = NOSPLASH
 
 	set_up(var/newloc, var/do_enters = 1)
 		if (is_setup) return
@@ -74,8 +70,10 @@ var/list/ban_from_airborne_fluid = list()
 		..()
 
 	//ALTERNATIVE to force ingest in life
-	proc/just_do_the_apply_thing(var/mob/M, var/mult = 1, var/hasmask = 0)
+	proc/just_do_the_apply_thing(var/mob/M, var/mult = 1, var/hasmask = 0, var/exception = null)
 		if (!M) return
+		if (check_target_immunity(M, TRUE))
+			return
 		if (!src.group || !src.group.reagents || !src.group.reagents.reagent_list) return
 
 		var/react_volume = src.amt > 10 ? (src.amt-10) / 3 + 10 : (src.amt)
@@ -90,14 +88,16 @@ var/list/ban_from_airborne_fluid = list()
 			var/turftemp = T.temperature
 			plist["override_can_burn"] = (src.group.reagents.total_temperature + turftemp + turftemp) / 3
 
-		src.group.reagents.reaction(M, TOUCH, react_volume/2, 0, paramslist = plist)
+		src.group.reagents.reaction(M, TOUCH, react_volume/2, 0, paramslist = plist, exception = exception)
 
 		if (!hasmask)
-			src.group.reagents.reaction(M, INGEST, react_volume/2,1,src.group.members.len, paramslist = plist)
-			src.group.reagents.trans_to(M, react_volume)
+			src.group.reagents.reaction(M, INGEST, react_volume/2,1,src.group.members.len, paramslist = plist, exception = exception)
+			src.group.reagents.trans_to(M, react_volume, exception = exception)
 
-	force_mob_to_ingest(var/mob/M, var/mult = 1)//called when mob is drowning/standing in the smoke
+	force_mob_to_ingest(var/mob/M, var/mult = 1, var/exception = null)//called when mob is drowning/standing in the smoke
 		if (!M) return
+		if (check_target_immunity(M, TRUE))
+			return
 		if (!src.group || !src.group.reagents || !src.group.reagents.reagent_list) return
 
 		var/react_volume = src.amt > 10 ? (src.amt-10) / 3 + 10 : (src.amt)
@@ -108,13 +108,14 @@ var/list/ban_from_airborne_fluid = list()
 		var/turf/T = get_turf(src)
 		var/list/plist = list()
 		plist["dmg_multiplier"] = 0.08
+		plist += "inhaled"
 		if (T) //average that shit with the air temp
 			var/turftemp = T.temperature
 			plist["override_can_burn"] = (src.group.reagents.total_temperature + turftemp + turftemp) / 3
 
-		src.group.reagents.reaction(M, TOUCH, react_volume/2, 0, paramslist = plist)
-		src.group.reagents.reaction(M, INGEST, react_volume/2,1,src.group.members.len, paramslist = plist)
-		src.group.reagents.trans_to(M, react_volume)
+		src.group.reagents.reaction(M, TOUCH, react_volume/2, 0, paramslist = plist, exception = exception)
+		src.group.reagents.reaction(M, INGEST, react_volume/2,1,src.group.members.len, paramslist = plist, exception = exception)
+		src.group.reagents.trans_to(M, react_volume, exception = exception)
 
 	//incorporate touch_modifier?
 	Crossed(atom/movable/A)
@@ -122,12 +123,6 @@ var/list/ban_from_airborne_fluid = list()
 		if (!src.group || !src.group.reagents || src.disposed || istype(A,/obj/fluid) || src.group.disposed)
 			return
 		A.EnteredAirborneFluid(src, A.last_turf)
-
-	Uncrossed(atom/movable/AM, atom/newloc)
-		return
-		//if (AM.event_handler_flags & USE_FLUID_ENTER)
-		//	AM.ExitedFluid(src,newloc)
-
 
 	add_tracked_blood(atom/movable/AM as mob|obj)
 		.=0
@@ -200,7 +195,6 @@ var/list/ban_from_airborne_fluid = list()
 					if (!F || !src.group || src.group.disposed) continue //set_up may decide to remove F
 
 					F.amt = src.group.amt_per_tile
-					F.name = src.name
 					F.color = src.finalcolor
 					F.finalcolor = src.finalcolor
 					F.alpha = src.finalalpha
@@ -294,8 +288,6 @@ var/list/ban_from_airborne_fluid = list()
 	update_icon(var/neighbor_was_removed = 0)  //BE WARNED THIS PROC HAS A REPLICA UP ABOVE IN FLUID GROUP UPDATE_LOOP. DO NOT CHANGE THIS ONE WITHOUT MAKING THE SAME CHANGES UP THERE OH GOD I HATE THIS
 		if (!src.group || !src.group.reagents) return
 
-		src.name = src.group.master_reagent_name ? src.group.master_reagent_name : src.group.reagents.get_master_reagent_name() //maybe obscure later?
-
 		var/datum/color/average = src.group.average_color ? src.group.average_color : src.group.reagents.get_average_color()
 		src.finalalpha = max(25, (average.a / 255) * src.group.max_alpha)
 		src.finalcolor = rgb(average.r, average.g, average.b)
@@ -306,11 +298,7 @@ var/list/ban_from_airborne_fluid = list()
 			last_spread_was_blocked = 0
 
 		//air specific:
-		var/old_opacity = src.opacity
 		src.set_opacity(group.reagents.get_master_reagent_gas_opaque())
-		if(src.opacity != old_opacity)
-			var/turf/L = src.loc
-			if(istype(L)) L.opaque_atom_count += src.opacity ? 1 : -1
 
 	update_perspective_overlays() // fancy perspective overlaying
 		.= 0
@@ -347,7 +335,9 @@ var/list/ban_from_airborne_fluid = list()
 
 	if (entered_group)
 		if (!src.clothing_protects_from_chems())
-			F.just_do_the_apply_thing(src, hasmask = issmokeimmune(src))
+			var/has_mask = issmokeimmune(src)
+			var/exception = ismiasmaimmune(src) ? "miasma" : null
+			F.just_do_the_apply_thing(src, hasmask = has_mask, exception = exception)
 
 /mob/living/silicon/EnteredAirborneFluid(obj/fluid/airborne/F as obj, atom/oldloc)
 	.=0

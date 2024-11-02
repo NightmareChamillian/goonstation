@@ -5,7 +5,7 @@
  * @license MIT
  */
 
-import { BooleanLike } from 'common/react';
+import { BooleanLike } from 'tgui-core/react';
 
 export interface RadioData {
   name: string;
@@ -24,6 +24,8 @@ export interface RadioData {
   code: number;
   hasMicrophone: BooleanLike;
   sendButton: BooleanLike;
+  hasToggleButton: BooleanLike;
+  power: BooleanLike;
 }
 
 export enum RadioWires {

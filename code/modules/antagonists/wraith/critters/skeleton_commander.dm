@@ -14,10 +14,13 @@
 	health_brute_vuln = 0.7
 	health_burn = 90
 	health_burn_vuln = 0.3
-	var/mob/wraith/master = null
+	can_bleed = FALSE
+	var/mob/living/intangible/wraith/master = null
 	var/deathsound = "sound/impact_sounds/plate_break.ogg"
 
-	New(var/turf/T, var/mob/wraith/M = null)
+	faction = list(FACTION_WRAITH)
+
+	New(var/turf/T, var/mob/living/intangible/wraith/M = null)
 		..(T)
 		if(M != null)
 			src.master = M
@@ -27,6 +30,7 @@
 			M.summons += src
 
 		APPLY_ATOM_PROPERTY(src, PROP_MOB_NIGHTVISION_WEAK, src)
+		src.add_stam_mod_max("commander", 50)
 		abilityHolder.addAbility(/datum/targetable/critter/skeleton_commander/rally)
 		abilityHolder.addAbility(/datum/targetable/critter/skeleton_commander/summon_lesser_skeleton)
 
@@ -35,6 +39,9 @@
 		add_hh_flesh_burn(src.health_burn, src.health_burn_vuln)
 
 	death(var/gibbed)
+		if (src.master)
+			src.master.summons -= src
+			src.master = null
 		if (!gibbed)
 			src.unequip_all()
 			playsound(src, src.deathsound, 50, 0)
@@ -64,6 +71,7 @@
 		HH.can_range_attack = 1
 
 /datum/limb/halberd
+	can_beat_up_robots = TRUE
 	attack_range(atom/target, var/mob/user, params)
 		switch (user.a_intent)
 			if (INTENT_HELP)
@@ -93,14 +101,14 @@
 						if(A in attacked) continue
 						if(ismob(A) && !isobserver(A))
 							var/mob/M = A
-							M.TakeDamageAccountArmor("All", rand(5,7), 0, 0, DAMAGE_CUT)
+							M.TakeDamageAccountArmor("All", rand(7,9), 0, 0, DAMAGE_CUT)
 							attacked += A
 							hit = TRUE
 
 				if (!hit)
-					playsound(user, "sound/effects/swoosh.ogg", 50, 0)
+					playsound(user, 'sound/effects/swoosh.ogg', 50, FALSE)
 				else
-					playsound(user, "sound/impact_sounds/Flesh_Cut_1.ogg", 50, 0)
+					playsound(user, 'sound/impact_sounds/Flesh_Cut_1.ogg', 50, FALSE)
 				return 0
 			if (INTENT_GRAB)
 				if(!isturf(target.loc) && !isturf(target)) return
@@ -122,12 +130,12 @@
 						if(A in attacked) continue
 						if(ismob(A) && !isobserver(A))
 							var/mob/M = A
-							M.TakeDamageAccountArmor("All", rand(6,7), 0, 0, DAMAGE_STAB)
+							M.TakeDamageAccountArmor("All", rand(8,9), 0, 0, DAMAGE_STAB)
 							attacked += A
 							hit = TRUE
 
 				if (!hit)
-					playsound(user, 'sound/effects/swoosh.ogg', 50, 0)
+					playsound(user, 'sound/effects/swoosh.ogg', 50, FALSE)
 				else
 					playsound(user, 'sound/impact_sounds/Flesh_Stab_3.ogg', 80)
 
@@ -143,24 +151,26 @@
 				for(var/atom/A in turf)
 					if(ismob(A) && !isobserver(A))
 						var/mob/M = A
-						M.TakeDamageAccountArmor("All", rand(5,6), 0, 0, DAMAGE_CUT)
+						M.TakeDamageAccountArmor("All", rand(7,9), 0, 0, DAMAGE_CUT)
 						hit = TRUE
 						break
 
 				if (!hit)
-					playsound(user, 'sound/effects/swoosh.ogg', 50, 0)
+					playsound(user, 'sound/effects/swoosh.ogg', 50, FALSE)
 				else
 					playsound(user, 'sound/impact_sounds/Flesh_Stab_3.ogg', 80)
 
 	harm(mob/target, var/mob/living/user)
 		if(check_target_immunity( target ))
 			return 0
-		logTheThing("combat", user, target, "stabs [constructTarget(target,"combat")] with [src] at [log_loc(user)].")
-		var/obj/item/affecting = target.get_affecting(user)
-		var/datum/attackResults/msgs = user.calculate_melee_attack(target, affecting, 6, 9, rand(5,7), can_punch = 0, can_kick = 0)
-		user.attack_effects(target, affecting)
+		logTheThing(LOG_COMBAT, user, "stabs [constructTarget(target,"combat")] with [src] at [log_loc(user)].")
+		if (issilicon(target))
+			special_attack_silicon(target, user)
+			return
+		var/datum/attackResults/msgs = user.calculate_melee_attack(target, 6, 9, rand(5,7), can_punch = 0, can_kick = 0)
+		user.attack_effects(target, user.zone_sel?.selecting)
 		var/action = pick("slashes", "stabs", "pierces")
-		msgs.base_attack_message = "<b><span class='alert'>[user] [action] [target] with their [src.holder]!</span></b>"
+		msgs.base_attack_message = SPAN_ALERT("<b>[user] [action] [target] with their [src.holder]!</b>")
 		msgs.played_sound = "sound/impact_sounds/Flesh_Stab_3.ogg"
 		msgs.damage_type = DAMAGE_STAB
 		msgs.flush(SUPPRESS_LOGS)

@@ -9,7 +9,8 @@
 	type_size = ARTIFACT_SIZE_LARGE
 	rarity_weight = 350
 	validtypes = list("martian","eldritch","precursor")
-	validtriggers = list(/datum/artifact_trigger/force,/datum/artifact_trigger/radiation,/datum/artifact_trigger/carbon_touch,/datum/artifact_trigger/silicon_touch)
+	validtriggers = list(/datum/artifact_trigger/force,/datum/artifact_trigger/radiation,/datum/artifact_trigger/carbon_touch,/datum/artifact_trigger/silicon_touch,
+		/datum/artifact_trigger/language)
 	fault_blacklist = list(ITEM_ONLY_FAULTS,TOUCH_ONLY_FAULTS)
 	activ_text = "opens up, revealing a strange horn!"
 	deact_text = "closes itself up."
@@ -53,7 +54,7 @@
 			if (L.hearing_check(1))
 				if(count++ > 15) break
 				if(picked_emote == "fart")
-					if(!(locate(/obj/item/storage/bible) in get_turf(L))) //bible fart bad
+					if(!(locate(/obj/item/bible) in get_turf(L))) //bible fart bad
 						L.emote(picked_emote, FALSE)
 				else
 					L.emote(picked_emote, FALSE)

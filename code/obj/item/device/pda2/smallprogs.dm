@@ -18,6 +18,9 @@
 //Ticket writer
 //Cargo request
 //Station Namer
+//Revhead tracker
+//Head tracker
+//Generator Controller
 
 //Banking
 /datum/computer/file/pda_program/banking
@@ -79,17 +82,16 @@
 
 		dat += "<h4>Station Status Display Interlink</h4>"
 
-		dat += "\[ <A HREF='?src=\ref[src];statdisp=blank'>Clear</A> \]<BR>"
-		dat += "\[ <A HREF='?src=\ref[src];statdisp=shuttle'>Shuttle ETA</A> \]<BR>"
-		dat += "\[ <A HREF='?src=\ref[src];statdisp=message'>Message</A> \]"
+		dat += "\[ <A HREF='?src=\ref[src];statdisp=[STATUS_DISPLAY_PACKET_MODE_DISPLAY_DEFAULT]'>Default</A> \]<BR>"
+		dat += "\[ <A HREF='?src=\ref[src];statdisp=[STATUS_DISPLAY_PACKET_MODE_DISPLAY_SHUTTLE]'>Shuttle ETA</A> \]<BR>"
+		dat += "\[ <A HREF='?src=\ref[src];statdisp=[STATUS_DISPLAY_PACKET_MODE_MESSAGE]'>Message</A> \]"
 
-		dat += "<ul><li> Line 1: <A HREF='?src=\ref[src];statdisp=setmsg1'>[ message1 ? message1 : "(none)"]</A>"
-		dat += "<li> Line 2: <A HREF='?src=\ref[src];statdisp=setmsg2'>[ message2 ? message2 : "(none)"]</A></ul><br>"
-		dat += "\[ Alert: <A HREF='?src=\ref[src];statdisp=alert;alert=default'>None</A> |"
-
-		dat += " <A HREF='?src=\ref[src];statdisp=alert;alert=redalert'>Red Alert</A> |"
-		dat += " <A HREF='?src=\ref[src];statdisp=alert;alert=lockdown'>Lockdown</A> |"
-		dat += " <A HREF='?src=\ref[src];statdisp=alert;alert=biohazard'>Biohazard</A> \]<BR>"
+		dat += "<ul><li> Line 1: <A HREF='?src=\ref[src];statdisp=[STATUS_DISPLAY_PACKET_MESSAGE_TEXT_1]'>[ message1 ? message1 : "(none)"]</A>"
+		dat += "<li> Line 2: <A HREF='?src=\ref[src];statdisp=[STATUS_DISPLAY_PACKET_MESSAGE_TEXT_2]'>[ message2 ? message2 : "(none)"]</A></ul><br>"
+		dat += "\[ Alert: "
+		dat += " <A HREF='?src=\ref[src];statdisp=[STATUS_DISPLAY_PACKET_MODE_DISPLAY_ALERT];alert=[STATUS_DISPLAY_PACKET_ALERT_REDALERT]'>Red Alert</A> |"
+		dat += " <A HREF='?src=\ref[src];statdisp=[STATUS_DISPLAY_PACKET_MODE_DISPLAY_ALERT];alert=[STATUS_DISPLAY_PACKET_ALERT_LOCKDOWN]'>Lockdown</A> |"
+		dat += " <A HREF='?src=\ref[src];statdisp=[STATUS_DISPLAY_PACKET_MODE_DISPLAY_ALERT];alert=[STATUS_DISPLAY_PACKET_ALERT_BIOHAZ]'>Biohazard</A> \]<BR>"
 
 		return dat
 
@@ -100,12 +102,15 @@
 
 		if(href_list["statdisp"])
 			switch(href_list["statdisp"])
-				if("message")
-					post_status("message", message1, message2)
-				if("alert")
-					post_status("alert", href_list["alert"])
+				if(STATUS_DISPLAY_PACKET_MODE_DISPLAY_DEFAULT)
+					post_status(STATUS_DISPLAY_PACKET_MODE_DISPLAY_DEFAULT)
+				if(STATUS_DISPLAY_PACKET_MODE_MESSAGE)
+					post_status(STATUS_DISPLAY_PACKET_MODE_MESSAGE, message1, message2)
 
-				if("setmsg1")
+				if(STATUS_DISPLAY_PACKET_MODE_DISPLAY_ALERT)
+					post_status(STATUS_DISPLAY_PACKET_MODE_DISPLAY_ALERT, href_list["alert"])
+
+				if(STATUS_DISPLAY_PACKET_MESSAGE_TEXT_1)
 					if (!src.master?.is_user_in_interact_range(usr))
 						return
 
@@ -116,7 +121,7 @@
 					message1 = copytext(adminscrub(message1), 1, MAX_MESSAGE_LEN)
 					src.master.updateSelfDialog()
 
-				if("setmsg2")
+				if(STATUS_DISPLAY_PACKET_MESSAGE_TEXT_2)
 					if (!src.master?.is_user_in_interact_range(usr))
 						return
 
@@ -422,7 +427,7 @@ Code:
 
 		dat += "<h4>DoorMaster 5.1.9 Pod-Door Control System</h4>"
 		dat += "<a href='?src=\ref[src];toggle=1'>Toggle Doors</a><br><br>"
-		dat += "<font size=1><i>Like this program? Send $9.95 to SPACETREND MICROSYSTEMS in Neo Toronto, Ontario for more bargain software!</i></font>"
+		dat += "<font size=1><i>Like this program? Send 9.95[CREDIT_SIGN] to SPACETREND MICROSYSTEMS in Neo Toronto, Ontario for more bargain software!</i></font>"
 
 		return dat
 
@@ -505,7 +510,7 @@ Code:
 			null, \
 			FALSE \
 		)
-		RegisterSignal(pda, COMSIG_MOVABLE_RECEIVE_PACKET, .proc/receive_signal)
+		RegisterSignal(pda, COMSIG_MOVABLE_RECEIVE_PACKET, PROC_REF(receive_signal))
 
 	on_deactivated(obj/item/device/pda2/pda)
 		qdel(get_radio_connection_by_id(pda, "report"))
@@ -548,7 +553,7 @@ Code:
 //PDA program for displaying engine data and laser output. By FishDance
 //Note: Could display weird results if there is more than one engine or PTL around.
 /datum/computer/file/pda_program/power_checker
-	name = "Power Checker 0.14"
+	name = "Power Checker 0.15"
 	size = 4
 
 	var/obj/machinery/atmospherics/binary/circulatorTemp/circ1
@@ -556,10 +561,12 @@ Code:
 	var/obj/machinery/power/pt_laser/laser
 	var/obj/machinery/power/generatorTemp/generator
 	var/obj/machinery/carouselpower/carousel
+	var/obj/machinery/atmospherics/binary/reactor_turbine/nuke_turbine
+	var/obj/machinery/atmospherics/binary/nuclear_reactor/nuke_reactor
 
 	proc/find_machinery(obj/ref, type)
 		if(!ref || ref.disposed)
-			ref = locate(type) in machine_registry[MACHINES_POWER]
+			ref = locate(type) in (machine_registry[MACHINES_POWER] + machine_registry[MACHINES_FISSION])
 			if(ref?.z != 1) ref = null
 		. = ref
 
@@ -576,14 +583,18 @@ Code:
 		if (generator && (!circ2 || circ2.disposed ))
 			circ2 = generator.circ2
 
+		//NUKE
+		nuke_turbine = find_machinery(nuke_turbine, /obj/machinery/atmospherics/binary/reactor_turbine)
+		nuke_reactor = find_machinery(nuke_reactor, /obj/machinery/atmospherics/binary/nuclear_reactor)
 		//PTL
 		laser = find_machinery(laser, /obj/machinery/power/pt_laser)
 
 		. = src.return_text_header()
-
+		. += "<BR>"
+		//TEG
 		if (generator)
 			engine_found = TRUE
-			. += "<BR><h4>Thermo-Electric Generator Status</h4>"
+			. += "<h4>Thermo-Electric Generator Status</h4>"
 			. += "Output : [engineering_notation(generator.lastgen)]W<BR>"
 			. += "<BR>"
 
@@ -599,6 +610,7 @@ Code:
 				. += "Pressure Inlet: [round(MIXTURE_PRESSURE(circ2?.air1), 0.1)] kPa  Outlet: [round(MIXTURE_PRESSURE(circ2?.air2), 0.1)] kPa<BR>"
 				. += "<BR>"
 
+		// SINGULO
 		if(length(by_type[/obj/machinery/power/collector_control]))
 			var/controler_index = 1
 			var/collector_index = 1
@@ -606,7 +618,7 @@ Code:
 				collector_index = 1
 				if(C?.active && C.z == 1)
 					engine_found = TRUE
-					. += "<BR><h4>Radiation Collector [controler_index++] Status</h4>"
+					. += "<h4>Radiation Collector [controler_index++] Status</h4>"
 					. += "Output: [engineering_notation(C.lastpower)]W<BR>"
 					if(C.CA1?.active) . += "Collector [collector_index++]: Tank Pressure: [C.P1 ? round(MIXTURE_PRESSURE(C.P1.air_contents), 0.1) : "ERR"] kPa<BR>"
 					if(C.CA2?.active) . += "Collector [collector_index++]: Tank Pressure: [C.P2 ? round(MIXTURE_PRESSURE(C.P2.air_contents), 0.1) : "ERR"] kPa<BR>"
@@ -614,20 +626,64 @@ Code:
 					if(C.CA4?.active) . += "Collector [collector_index++]: Tank Pressure: [C.P4 ? round(MIXTURE_PRESSURE(C.P4.air_contents), 0.1) : "ERR"] kPa<BR>"
 					. += "<BR>"
 
+		// NUKE
+		if(nuke_reactor)
+			engine_found = TRUE
+			// for some unfathomable reason trying to detect reactor rod insertion broke the whole damn thing. Todo for a better coder i guess
+			. += "<BR><h4>Reactor Status</h4>"
+			. += "Radiation Level: [engineering_notation(nuke_reactor.radiationLevel)] clicks<BR>"
+			. += "Reactor temperature: [nuke_reactor.temperature] K<BR>"
+			// . += "Control rod insertion: [rodlevel * 100]%"
+			if (isnull(nuke_turbine))
+				. += "<B>Error!</B> No turbine detected!<BR>"
+		if (nuke_turbine)
+			engine_found = TRUE
+			. += "<h4>Turbine Status</h4>"
+			. += "Output : [engineering_notation(nuke_turbine.lastgen)]W<BR>"
+			. += "RPM : [engineering_notation(nuke_turbine.RPM)]<BR>"
+			. += "Stator Load: [engineering_notation(nuke_turbine.stator_load)]J/RPM<BR>"
+			. += "Turbine contents temperature : [engineering_notation(nuke_turbine.air_contents?.temperature)] K<BR>"
+			if (isnull(nuke_reactor))
+				. += "<B>Error!</B> No reactor detected!<BR>"
+			. += "<BR>"
+
+		//HOTSPOT
 		if(length(by_type[/obj/machinery/power/vent_capture]))
-			. += "<BR><h4>Vent Capture Unit Status</h4>"
+			. += "<h4>Vent Capture Unit Status</h4>"
 			for_by_tcl(V, /obj/machinery/power/vent_capture)
 				if(V.z == 1 && (locate(/obj/machinery/computer/power_monitor/smes) in V.powernet?.nodes) )
 					engine_found = TRUE
 					. += "Output : [engineering_notation(V.last_gen)]W<BR>"
 			. += "<BR>"
+		. += "<HR>"
+		// CATALYTICS
+		if(length(by_type[/obj/machinery/power/catalytic_generator]))
+			var/generator_index = 1
+			for_by_tcl(C, /obj/machinery/power/catalytic_generator)
+				if(C.z == 1)
+					engine_found = TRUE
+					. += "<h4>Catalytic Generator [generator_index++] Status</h4>"
+					. += "Output: [engineering_notation(C.gen_rate)]W<BR>"
+					if(C.anode_unit?.contained_rod)
+						. += "Anode Rod Condition: [round(C.anode_unit.contained_rod.condition)]%<BR>"
+						. += "Anode Rod Efficacy: [round(C.anode_unit.contained_rod.anode_efficacy)]% Base - [C.anode_unit.report_efficacy()]% Current<BR>"
+					else
+						. += "No Anode Rod Installed<BR>"
+					if(C.cathode_unit?.contained_rod)
+						. += "Cathode Rod Condition: [round(C.cathode_unit.contained_rod.condition)]%<BR>"
+						. += "Cathode Rod Efficacy: [round(C.cathode_unit.contained_rod.cathode_efficacy)]% Base - [C.cathode_unit.report_efficacy()]% Current<BR>"
+					else
+						. += "No Cathode Rod Installed<BR>"
+					. += "<BR>"
+
+		// todo: have some solar stats pop up, like angle and rate and whatnot. Once #13206 is in this'll have more info
 
 		if(!engine_found)
-			. += "<BR><B>Error!</B> No power source detected!<BR><BR>"
+			. += "<B>Error!</B> No power source detected!<BR><BR>"
 
 		. += "<HR>"
 		if(laser)
-			. += "<BR><B>Power Transmition Laser Status</B><BR>"
+			. += "<BR><B>Power Transmission Laser Status</B><BR>"
 			. += "Currently Active: [laser.firing ? "Yes" : "No"]<BR>"
 			. += "Power Stored: [engineering_notation(laser.charge)]J ([round(100.0*laser.charge/laser.capacity, 0.1)]%)<BR>"
 			. += "Power Input: [engineering_notation(laser.chargelevel)]W<BR>"
@@ -774,15 +830,30 @@ Code:
 
 		last_transmission = ticker.round_elapsed_ticks
 		var/mailgroup
+		var/alert_color
+		var/alert_title
+		var/alert_sound
 		switch (round(mailgroupNum))
 			if (-INFINITY to 1)
 				mailgroup = MGD_MEDBAY
+				alert_color = "#337296"
+				alert_title = "Medical"
+				alert_sound = 'sound/items/medical_alert.ogg'
 			if (2)
 				mailgroup = MGO_ENGINEER
+				alert_color = "#a8732b"
+				alert_title = "Engineering"
+				alert_sound = 'sound/items/engineering_alert.ogg'
 			if (3)
 				mailgroup = MGD_SECURITY
+				alert_color = "#a30000"
+				alert_title = "Security"
+				alert_sound = 'sound/items/security_alert.ogg'
 			if (4 to INFINITY)
 				mailgroup = MGO_JANITOR
+				alert_color = "#993399"
+				alert_title = "Janitor"
+				alert_sound = 'sound/items/janitor_alert.ogg'
 
 		var/datum/signal/signal = get_free_signal()
 		signal.source = src.master
@@ -790,26 +861,32 @@ Code:
 		signal.data["command"] = "text_message"
 		signal.data["sender_name"] = src.master.owner
 		signal.data["group"] = list(mailgroup, MGA_CRISIS)
+		// prevent message spam for same-department alert ACKs
+		if (mailgroup in src.master.mailgroups)
+			signal.data["noreply"] = TRUE
+		else
+			signal.data["noreply"] = FALSE
 		var/area/an_area = get_area(src.master)
 
 		if (isAIeye(usr))
 			var/turf/eye_loc = get_turf(usr)
-			if (!(eye_loc.camera_coverage_emitters && length(eye_loc.camera_coverage_emitters)))
+			if (length(eye_loc.camera_coverage_emitters))
 				an_area = get_area(eye_loc)
 
-		signal.data["message"] = "<b><span class='alert'>***CRISIS ALERT*** Location: [an_area ? an_area.name : "nowhere"]!</span></b>"
+		signal.data["message"] = "***CRISIS ALERT*** Location: [an_area ? an_area.name : "nowhere"]!"
+		signal.data["is_alert"] = TRUE
 
 		src.post_signal(signal)
 
 		if(isliving(usr) && !remote)
-			playsound(src.master, 'sound/items/security_alert.ogg', 60)
+			playsound(src.master, alert_sound, 60)
 			var/map_text = null
-			map_text = make_chat_maptext(usr, "Emergency alert sent.", "font-family: 'Helvetica'; color: #D30000; font-size: 7px;", alpha = 215)
+			map_text = make_chat_maptext(usr, "[alert_title] Emergency alert sent.", "color: [alert_color]; font-size: 6px;", alpha = 215)
 			for (var/mob/O in hearers(usr))
 				O.show_message(assoc_maptext = map_text)
-			usr.visible_message("<span class='alert'>[usr] presses a red button on the side of their [src.master].</span>",
-			"<span class='notice'>You press the \"Alert\" button on the side of your [src.master].</span>",
-			"<span class='alert'>You see [usr] press a button on the side of their [src.master].</span>")
+			usr.visible_message(SPAN_ALERT("[usr] presses a red button on the side of their [src.master]."),
+			SPAN_NOTICE("You press the \"Alert\" button on the side of your [src.master]."),
+			SPAN_ALERT("You see [usr] press a button on the side of their [src.master]."))
 
 //Whoever runs this gets to explode.
 /datum/computer/file/pda_program/bomb
@@ -966,12 +1043,9 @@ Using electronic "Detomatix" SELF-DESTRUCT program is perhaps less simple!<br>
 								dat += "[T.text]<br>"
 
 				if(2) //requested fines
-					var/can_approve = 0
 
 					var/PDAowner = src.master.owner
 					var/PDAownerjob = data_core.general.find_record("name", PDAowner)?["rank"] || "Unknown Job"
-
-					if(PDAownerjob in list("Head of Security","Head of Personnel","Captain")) can_approve = 1
 
 					dat += "<br><br><a href='byond://?src=\ref[src];back=1'>Back</a>"
 
@@ -980,7 +1054,7 @@ Using electronic "Detomatix" SELF-DESTRUCT program is perhaps less simple!<br>
 					for (var/datum/fine/F in data_core.fines)
 						if(!F.approver)
 							dat += "[F.target]: [F.amount] credits<br>Reason: [F.reason]<br>Requested by: [F.issuer] - [F.issuer_job]"
-							if(can_approve) dat += "<br><a href='byond://?src=\ref[src];approve=\ref[F]'>Approve Fine</a>"
+							if((PDAownerjob in JOBS_CAN_TICKET_BIG) || ((PDAownerjob in JOBS_CAN_TICKET_SMALL) && F.amount <= MAX_FINE_NO_APPROVAL)) dat += "<br><a href='byond://?src=\ref[src];approve=\ref[F]'>Approve Fine</a>"
 							dat += "<br><br>"
 
 				if(3) //unpaid fines
@@ -1014,10 +1088,10 @@ Using electronic "Detomatix" SELF-DESTRUCT program is perhaps less simple!<br>
 			var/PDAowner = src.master.owner
 			var/PDAownerjob = data_core.general.find_record("name", PDAowner)?["rank"] || "Unknown Job"
 
-			var/ticket_target = input(usr, "Ticket recipient:",src.name) as text
+			var/ticket_target = input(usr, "Ticket recipient:",src.name) as text | null
 			if(!ticket_target) return
 			ticket_target = copytext(sanitize(html_encode(ticket_target)), 1, MAX_MESSAGE_LEN)
-			var/ticket_reason = input(usr, "Ticket reason:",src.name) as text
+			var/ticket_reason = input(usr, "Ticket reason:",src.name) as text | null
 			if(!ticket_reason) return
 			ticket_reason = copytext(sanitize(html_encode(ticket_reason)), 1, MAX_MESSAGE_LEN)
 
@@ -1037,7 +1111,7 @@ Using electronic "Detomatix" SELF-DESTRUCT program is perhaps less simple!<br>
 			playsound(src.master, 'sound/machines/printer_thermal.ogg', 50, 1)
 			SPAWN(3 SECONDS)
 				var/obj/item/paper/p = new /obj/item/paper
-				p.set_loc(get_turf(src.master))
+				usr.put_in_hand_or_drop(p)
 				p.name = "Official Caution - [ticket_target]"
 				p.info = ticket_text
 				p.icon_state = "paper_caution"
@@ -1054,7 +1128,7 @@ Using electronic "Detomatix" SELF-DESTRUCT program is perhaps less simple!<br>
 			var/PDAowner = src.master.owner
 			var/PDAownerjob = data_core.general.find_record("name", PDAowner)?["rank"] || "Unknown Job"
 
-			var/ticket_target = input(usr, "Fine recipient:",src.name) as text
+			var/ticket_target = input(usr, "Fine recipient:",src.name) as text | null
 			if(!ticket_target) return
 			ticket_target = copytext(strip_html(ticket_target),	 1, MAX_MESSAGE_LEN)
 			var/has_bank_record = !!data_core.bank.find_record("name", ticket_target)
@@ -1062,12 +1136,12 @@ Using electronic "Detomatix" SELF-DESTRUCT program is perhaps less simple!<br>
 				message = "Error: No bank records found for [ticket_target]."
 				src.master.updateSelfDialog()
 				return
-			var/ticket_reason = input(usr, "Fine reason:",src.name) as text
+			var/ticket_reason = input(usr, "Fine reason:",src.name) as text | null
 			if(!ticket_reason) return
 			ticket_reason = copytext(strip_html(ticket_reason), 1, MAX_MESSAGE_LEN)
-			var/fine_amount = input(usr, "Fine amount (1-1000):",src.name, 0) as num
+			var/fine_amount = input(usr, "Fine amount (1-10000):",src.name, 0) as num | null
 			if(!isnum_safe(fine_amount)) return
-			fine_amount = min(fine_amount,1000)
+			fine_amount = min(fine_amount,10000)
 			fine_amount = max(fine_amount,1)
 
 			var/datum/fine/F = new /datum/fine()
@@ -1080,19 +1154,22 @@ Using electronic "Detomatix" SELF-DESTRUCT program is perhaps less simple!<br>
 			F.issuer_byond_key = usr.key
 			data_core.fines += F
 
-			logTheThing(LOG_ADMIN, usr, "fines <b>[ticket_target]</b> with the reason: [ticket_reason].")
-			if(PDAownerjob in list("Head of Security","Head of Personnel","Captain"))
+			logTheThing(LOG_ADMIN, usr, "requested a fine using [PDAowner]([PDAownerjob])'s PDA. It is a [fine_amount] credit fine on <b>[ticket_target]</b> with the reason: [ticket_reason].")
+			if((fine_amount <= MAX_FINE_NO_APPROVAL && (PDAownerjob in JOBS_CAN_TICKET_SMALL)) || (PDAownerjob in JOBS_CAN_TICKET_BIG))
 				var/ticket_text = "[ticket_target] has been fined [fine_amount] credits by Nanotrasen Corporate Security for [ticket_reason] on [time2text(world.realtime, "DD/MM/53")].<br>Issued and approved by: [PDAowner] - [PDAownerjob]<br>"
 				playsound(src.master, 'sound/machines/printer_thermal.ogg', 50, 1)
 				SPAWN(3 SECONDS)
 					F.approve(PDAowner,PDAownerjob)
 					var/obj/item/paper/p = new /obj/item/paper
-					p.set_loc(get_turf(src.master))
+					usr.put_in_hand_or_drop(p)
 					p.name = "Official Fine Notification - [ticket_target]"
 					p.info = ticket_text
 					p.icon_state = "paper_caution"
+
+			else if(fine_amount <= MAX_FINE_NO_APPROVAL)
+				message = "Fine request created, awaiting approval from the [english_list(JOBS_CAN_TICKET_SMALL, "nobody", " or ")]."
 			else
-				message = "Fine request created, awaiting approval from the Captain, Head of Security or Head of Personnel."
+				message = "Fine request created, awaiting approval from the [english_list(JOBS_CAN_TICKET_BIG, "nobody", " or ")]."
 
 		else if(href_list["approve"])
 			var/PDAowner = src.master.owner
@@ -1105,7 +1182,7 @@ Using electronic "Detomatix" SELF-DESTRUCT program is perhaps less simple!<br>
 				F.approve(PDAowner,PDAownerjob)
 				var/ticket_text = "[F.target] has been fined [F.amount] credits by Nanotrasen Corporate Security for [F.reason] on [time2text(world.realtime, "DD/MM/53")].<br>Requested by: [F.issuer] - [F.issuer_job]<br>Approved by: [PDAowner] - [PDAownerjob]<br>"
 				var/obj/item/paper/p = new /obj/item/paper
-				p.set_loc(get_turf(src.master))
+				usr.put_in_hand_or_drop(p)
 				p.name = "Official Fine Notification - [F.target]"
 				p.info = ticket_text
 				p.icon_state = "paper_caution"
@@ -1193,6 +1270,7 @@ Using electronic "Detomatix" SELF-DESTRUCT program is perhaps less simple!<br>
 
 			O.object = P
 			O.orderedby = src.master.owner
+			O.address = src.master.net_id
 			O.console_location = get_area(src.master)
 			shippingmarket.supply_requests += O
 			src.temp = "Request sent to Supply Console. The Quartermasters will process your request as soon as possible.<BR>"
@@ -1284,17 +1362,19 @@ Using electronic "Detomatix" SELF-DESTRUCT program is perhaps less simple!<br>
 	var/x = -1
 	var/y = -1
 	var/z = -1
+	///Fully rendered text data about nearby celestial objects, cached here to line up with the coordinates
+	var/parallax_data = null
 
 	return_text()
 		if(..())
 			return
 
 		var/dat = src.return_text_header()
-		dat += "<h4>Space GPS: Pocket Edition</h4>"
+		dat += "<h3>Space GPS: Pocket Edition</h3>"
 
 		dat += "<a href='byond://?src=\ref[src];getloc=1'>Get Coordinates</a>"
-		if (x >= 0)
 
+		if (x >= 0)
 			var/landmark = "Unknown"
 			switch (src.z)
 				if (1)
@@ -1310,7 +1390,10 @@ Using electronic "Detomatix" SELF-DESTRUCT program is perhaps less simple!<br>
 					landmark = "Asteroid Field"
 					#endif
 
-			dat += "<BR>X = [src.x], Y = [src.y], Landmark: [landmark]"
+			dat += "<BR><b>\[</b>X = [src.x], Y = [src.y], Landmark: [landmark]<b>\]</b>"
+			dat += "<br>------------------------------------------------------------------------------"
+			dat += "<br><h4>Currently visible celestial bodies:</h4>"
+			dat += src.parallax_data
 
 		return dat
 
@@ -1323,7 +1406,367 @@ Using electronic "Detomatix" SELF-DESTRUCT program is perhaps less simple!<br>
 			src.x = T.x
 			src.y = T.y
 			src.z = T.z
+			src.parallax_data = ""
+			var/list/render_sources = usr.client?.parallax_controller?.parallax_render_sources
+			for (var/atom/movable/screen/parallax_render_source/source in render_sources)
+				if (source.visible_to_gps)
+					src.parallax_data += "<br><b>[source.name]</b> - [source.desc]<br>"
 
 		src.master.add_fingerprint(usr)
 		src.master.updateSelfDialog()
 		return
+
+/datum/computer/file/pda_program/revheadtracker
+	name = "Revolutionary Leader Locater"
+	size = 0
+	var/turf/nearest_head_location = null
+	var/direction
+	var/distance
+	var/pressed
+
+	return_text()
+		if(..())
+			return
+		for_by_tcl(random_eye, /mob/living/critter/small_animal/floateye/watchful)
+			if (prob(5)) // The satellite has 21 eyes in it. it's fine if more than one jitters but it shouldn't be all of them and it should be around 1.
+				random_eye.make_jittery(100)
+
+		var/dat = src.return_text_header()
+
+		if (!istype(ticker.mode, /datum/game_mode/revolution))
+			dat += "<h4>Watchful Eye infrared tracking not available at this time</h4>"
+			return dat
+
+		dat += "<h4>Watchful Eye Revolutionary Leader Tracker</h4>"
+
+		dat += "<a href='byond://?src=\ref[src];gethead=1'>Track nearest revolutionary leader</a>"
+		if(nearest_head_location == null && pressed) // Makes it so it doesnt show up by default
+			dat += "<BR>No alive revolutionary leaders located in this station's sector."
+		if(nearest_head_location != null)
+			dat += "<BR>Direction = [src.direction], Distance = [src.distance]"
+		return dat
+
+	Topic(href, href_list)
+		if(..())
+			return
+
+		if (href_list["gethead"])
+			pressed = 1
+			if (istype(ticker.mode, /datum/game_mode/revolution))
+				var/datum/game_mode/revolution/R = ticker.mode
+				var/list/datum/mind/heads = R.head_revolutionaries
+				var/turf/Turf = get_turf(usr)
+				nearest_head_location = null
+
+				for (var/datum/mind/Mind in heads)
+					if(!Mind.current)
+						continue
+					if(!istype(Mind.current, /mob/living/carbon/human))
+						continue
+					var/MindMob = Mind.current
+					var/turf/MindTurf = get_turf(MindMob)
+					if(!isalive(Mind.current) || MindTurf.z != 1)
+						continue
+					if(GET_DIST(Turf, MindTurf) <= GET_DIST(Turf, nearest_head_location))
+						nearest_head_location = MindTurf
+
+				if(nearest_head_location != null)
+					direction = dir2text(get_dir(Turf, nearest_head_location))
+					distance = GET_DIST(Turf, nearest_head_location)
+
+
+		src.master.add_fingerprint(usr)
+		src.master.updateSelfDialog()
+		return
+
+/datum/computer/file/pda_program/headtracker
+	name = "Nanotrasen Command Tracker"
+	size = 0
+	var/turf/nearest_head_location = null
+	var/direction
+	var/distance
+	var/pressed
+
+	return_text()
+		if(..())
+			return
+
+		var/dat = src.return_text_header()
+
+		if (!istype(ticker.mode, /datum/game_mode/revolution))
+			dat += "<h4>Egeria Providence Array infrared tracking not available at this time</h4>"
+			return dat
+
+		dat += "<h4>Egeria Providence Array Command Tracker</h4>"
+
+		dat += "<a href='byond://?src=\ref[src];gethead=1'>Track nearest head</a>"
+
+		if(nearest_head_location == null && pressed) // Makes it so it doesnt show up by default
+			dat += "<BR>No alive command members located in this station's sector."
+		if(nearest_head_location != null)
+			dat += "<BR>Direction = [src.direction], Distance = [src.distance]"
+		return dat
+
+	Topic(href, href_list)
+		if(..())
+			return
+
+		if (href_list["gethead"])
+			pressed = 1
+			if (istype(ticker.mode, /datum/game_mode/revolution))
+				var/datum/game_mode/revolution/R = ticker.mode
+				var/list/datum/mind/heads = R.get_all_heads()
+				var/turf/Turf = get_turf(usr)
+				nearest_head_location = null
+
+				for (var/datum/mind/Mind in heads)
+					if(!Mind.current)
+						continue
+					if(!istype(Mind.current, /mob/living/carbon/human))
+						continue
+					var/MindMob = Mind.current
+					var/turf/MindTurf = get_turf(MindMob)
+					if(!isalive(Mind.current) || MindTurf.z != 1)
+						continue
+					if(GET_DIST(Turf, MindTurf) <= GET_DIST(Turf, nearest_head_location))
+						nearest_head_location = MindTurf
+
+				if(nearest_head_location != null)
+					direction = dir2text(get_dir(Turf, nearest_head_location))
+					distance = GET_DIST(Turf, nearest_head_location)
+
+		src.master.add_fingerprint(usr)
+		src.master.updateSelfDialog()
+		return
+
+// utility for controlling power machinery
+/datum/computer/file/pda_program/power_controller
+	name = "Power Controller v1.0" // you should totally increment this if you make changes
+	size = 4
+	var/list/device_statuses = list()
+	var/list/device_messages = list()
+	var/list/cooldowns = list()
+
+	var/freq = FREQ_POWER_SYSTEMS
+
+	on_activated(obj/item/device/pda2/pda)
+		src.master.AddComponent(/datum/component/packet_connected/radio, \
+			"power_control",\
+			src.freq, \
+			src.master.net_id, \
+			null, \
+			FALSE, \
+			ADDRESS_TAG_POWER, \
+			FALSE \
+		)
+		RegisterSignal(pda, COMSIG_MOVABLE_RECEIVE_PACKET, PROC_REF(receive_signal))
+		src.get_devices()
+
+	on_deactivated(obj/item/device/pda2/pda)
+		qdel(get_radio_connection_by_id(pda, null))
+		UnregisterSignal(pda, COMSIG_MOVABLE_RECEIVE_PACKET)
+
+	return_text()
+		if(..())
+			return
+
+		var/dat = src.return_text_header()
+		dat += "<h4>Power Controller</h4>"
+		dat += "<a href='byond://?src=\ref[src];scan=1'>Scan</a>"
+		dat += "<hr>"
+		for (var/gen in src.device_statuses)
+			var/list/data = params2list(src.device_statuses[gen]["data"])
+			var/list/variables = params2list(src.device_statuses[gen]["vars"])
+			var/device = src.device_statuses[gen]["device"]
+
+			dat += "<b>[strip_html(gen)]\> [device ? strip_html(device) : ""]</b><ul>"
+
+			if (length(data) > 0)
+				dat += "<b>Data:</b><br>"
+				for (var/field in data)
+					dat += "[strip_html(field)]: [strip_html(data[field])]<br>"
+
+			if (length(variables) > 0)
+				dat += "<br><b>Variables:</b><br>"
+				for (var/field in variables)
+					dat += "[strip_html(field)]: <a href='byond://?src=\ref[src];set_var=[html_encode(field)]&netid=[gen]'>[strip_html(variables[field])]</a><br>"
+
+			dat += "</ul>"
+
+			if (gen in src.device_messages)
+				dat += "<b>Last Message:</b> [src.device_messages[gen]]"
+
+			dat += "<hr>"
+
+		return dat
+
+	Topic(href, href_list)
+		if (..())
+			return
+
+		if (href_list["scan"])
+			if (ON_COOLDOWN(src, "scan", 1 SECOND))
+				return
+
+			src.get_devices()
+
+		else if (href_list["set_var"])
+			if (!href_list["netid"])
+				return
+
+			var/datum/signal/signal = get_free_signal()
+			signal.source = src.master
+			signal.data["address_1"] = href_list["netid"]
+			signal.data["sender"] = src.master.net_id
+			signal.data["command"] = "set_var"
+			signal.data["var_name"] = html_decode(href_list["set_var"])
+
+			signal.data["data"] = strip_html(input("Please enter the selected variable's new value.", "Remote Variable Editor") as text) // better safe than sorry!
+
+			SEND_SIGNAL(src.master, COMSIG_MOVABLE_POST_RADIO_PACKET, signal, null, "power_control")
+
+		src.master.add_fingerprint(usr)
+
+	proc/receive_signal(obj/item/device/pda2/pda, datum/signal/signal, transmission_method, range, connection_id)
+		if(!signal || !src.master.net_id || signal.encryption)
+			return
+
+		var/sender = signal.data["sender"]
+		if (!sender)
+			return
+
+		if (signal.data["command"] == "ping_reply")
+			src.get_device_status(sender)
+			return
+
+		if (!signal.data["address_tag"] || signal.data["address_tag"] != ADDRESS_TAG_POWER)
+			return // we can assume we are not talking to a viable device
+
+		switch (signal.data["command"])
+			if ("status")
+				if (!signal.data["data"] && !signal.data["vars"])
+					return
+
+				src.device_statuses[sender] = signal.data // this packet should contain all the data we need
+				src.master.updateSelfDialog()
+				return
+
+			if ("error")
+				if (!(sender in src.device_statuses))
+					src.get_device_status()
+					return
+
+				if (!signal.data["data"])
+					return
+
+				if (!(sender in src.device_messages))
+					src.device_messages.Add(sender)
+
+				src.device_messages[sender] = signal.data["data"]
+				src.master.updateSelfDialog()
+				return
+
+	proc/get_device_status(var/target_id)
+		if (!target_id)
+			return
+
+		var/datum/signal/signal = get_free_signal()
+		signal.source = src.master
+		signal.data["address_1"] = target_id
+		signal.data["sender"] = src.master.net_id
+		signal.data["command"] = "status"
+
+		SEND_SIGNAL(src.master, COMSIG_MOVABLE_POST_RADIO_PACKET, signal, null, "power_control")
+
+	proc/get_devices() // ping all devices
+		src.device_statuses.Cut()
+		src.device_messages.Cut()
+		src.master.updateSelfDialog()
+
+		var/datum/signal/signal = get_free_signal()
+		signal.source = src.master
+		signal.data["address_1"] = "ping"
+		signal.data["sender"] = src.master.net_id
+
+		SEND_SIGNAL(src.master, COMSIG_MOVABLE_POST_RADIO_PACKET, signal, null, "power_control")
+
+//Genebooth Tracker
+/datum/computer/file/pda_program/genebooth_tracker
+	name = "Genebooth Tracker"
+	size = 6
+
+	return_text()
+		if(..())
+			return
+
+		. = src.return_text_header()
+
+		var/booth_counter = 0
+		for_by_tcl(booth, /obj/machinery/genetics_booth)
+			booth_counter += 1
+			. += "<hr><h4>GeneBooth [booth_counter]</h4>"
+			for (var/datum/geneboothproduct/product as anything in booth.offered_genes)
+				. += "<b>[product.name]</b> [product.cost][CREDIT_SIGN] | [product.uses] uses left"
+				if(product.locked)
+					. += " (locked)"
+				. += "<br>"
+				if(product.desc)
+					. += product.desc
+					. += "<br>"
+
+/datum/computer/file/pda_program/pressure_crystal_shopper
+	name = "Crystal Bazaar"
+	size = 2
+
+	return_text()
+		if(..())
+			return
+
+		. = src.return_text_header()
+
+		. += "<h4>The Pressure Crystal Market</h4> \
+			A few well-funded organizations will pay handsomely for crystals exposed to different pressure values. \
+			The bigger the boom, the higher the payout, although duplicate or similar data will be worth less.\
+			<br><br>\
+			<b>Certain pressure values are of particular interest and will reward bonuses:</b>\
+			<br>"
+		for (var/peak in shippingmarket.pressure_crystal_peaks)
+			var/peak_value = text2num(peak)
+			var/mult = shippingmarket.pressure_crystal_peaks[peak]
+			. += "[peak] kiloblast: \
+				[mult > 1 ? "<B>" : ""]worth [round(mult * 100, 0.01)]% of normal. \
+				[mult > 1 ? "Maximum estimated value: [round(mult * PRESSURE_CRYSTAL_VALUATION(peak_value))]</B> credits." : ""]<br>"
+		. += "<br><b>Pressure crystal values already sold:</b>\
+			<br>"
+		for (var/value in shippingmarket.pressure_crystal_sales)
+			. += "[value] kiloblast for [shippingmarket.pressure_crystal_sales[value]] credits.<br>"
+
+/datum/computer/file/pda_program/rockbox
+	name = "Rockbox™ Cloud Status"
+	size = 2
+
+	return_text()
+		if(..())
+			return
+
+		. = src.return_text_header()
+		. += "<h4>Rockbox™ Ore Cloud Status</h4>"
+
+		if (!istype(master.host_program, /datum/computer/file/pda_program/os/main_os) || !master.host_program:message_on)
+			. += SPAN_ALERT("Wireless messaging must be enabled to talk to the cloud!")
+			return
+
+		for_by_tcl(S, /obj/machinery/ore_cloud_storage_container)
+			. += "<b>Location: [get_area(S)]</b><br>"
+			if(S.is_disabled())
+				.= "No response from Rockbox™ Ore Cloud Storage Container!<br><br>"
+				continue
+			if (!length(S.ores))
+				. += "No ores stored in this Rockbox™ Ore Cloud Storage Container.<br><br>"
+				continue
+			.+= "<ul>"
+			var/list/ores = S.ores
+			for(var/ore in ores)
+				var/datum/ore_cloud_data/OCD = ores[ore]
+				. += "<li>[ore]: [OCD.amount] @ [OCD.for_sale ? "[OCD.price][CREDIT_SIGN]" : "Not for sale"] ([OCD.amount_sold] sold)</li>"
+			. += "</ul><br>"

@@ -9,42 +9,58 @@
 // // Alert status
 // // And arbitrary messages set by comms computer
 
+/obj/status_display_proxy
+	plane = PLANE_NOSHADOW_ABOVE
+	mouse_opacity = FALSE
+
 #define MAX_LEN 5
+TYPEINFO(/obj/machinery/status_display)
+	mats = 14
+
 /obj/machinery/status_display
 	icon = 'icons/obj/status_display.dmi'
 	icon_state = "frame"
 	name = "status display"
-	anchored = 1
+	anchored = ANCHORED
 	density = 0
-	mats = 14
+	plane = PLANE_NOSHADOW_ABOVE
 	deconstruct_flags = DECON_SCREWDRIVER | DECON_WRENCH | DECON_CROWBAR | DECON_WELDER | DECON_MULTITOOL
+	power_usage = 200
 	var/glow_in_dark_screen = TRUE
 	var/image/screen_image
 
-	var/mode = 1	// 0 = Blank
-					// 1 = Shuttle timer
-					// 2 = Arbitrary message(s)
-					// 3 = alert picture
-					// 4 = Supply shuttle timer  -- NO LONGER SUPPORTED
-					// 5 = Research station destruct timer
-					// 6 = Mining Ore Score Tracking -- NO LONGER SUPPORTED
+	/// Current mode of the display
+	var/mode = STATUS_DISPLAY_SHUTTLE
 
-	var/picture_state	// icon_state of alert picture
-	var/message1 = ""	// message line 1
-	var/message2 = ""	// message line 2
-	var/index1			// display index for scrolling messages or 0 if non-scrolling
+	/// icon_state of alert picture
+	var/picture_state
+	/// message line 1
+	var/message1 = ""
+	/// message line 2
+	var/message2 = ""
+	// display index for scrolling messages or 0 if non-scrolling
+	var/index1
 	var/index2
 	var/use_maptext = TRUE
 
-	var/lastdisplayline1 = ""		// the cached last displays
+	// the cached last displays
+	var/lastdisplayline1 = ""
 	var/lastdisplayline2 = ""
 
 	var/net_id = null
-	var/frequency = FREQ_STATUS_DISPLAY		// radio frequency
+	var/frequency = FREQ_STATUS_DISPLAY
 
-	var/display_type = 0		// bitmask of messages types to display: 0=normal  1=supply shuttle  2=reseach stn destruct
+	/// Screen will show zeta station self destruct messages
+	var/zeta_selfdestruct = FALSE
 
-	var/repeat_update = FALSE	// true if we are going to update again this ptick
+	/// Repeat update this ptick
+	var/repeat_update = FALSE
+
+	/// Reference to the nuclear bomb in Nuclear Operatives mode
+	var/obj/machinery/nuclearbomb/the_bomb = null
+
+	/// Proxy object for putting map text on top of overlays
+	var/obj/status_display_proxy/proxy = null
 
 	var/image/crt_image = null
 
@@ -52,11 +68,14 @@
 	// register for radio system
 	New()
 		..()
-		src.layer -= 0.2
+		src.proxy = new
+		src.layer -= 0.3
+		proxy.layer = src.layer + 0.1
+		src.vis_contents += proxy
 		crt_image = SafeGetOverlayImage("crt", src.icon, "crt")
-		crt_image.layer = src.layer + 0.1
+		crt_image.layer = src.layer + 0.2
 		crt_image.plane = PLANE_DEFAULT
-		crt_image.appearance_flags = NO_CLIENT_COLOR | RESET_ALPHA | KEEP_APART
+		crt_image.appearance_flags = NO_CLIENT_COLOR | RESET_ALPHA | KEEP_APART | PIXEL_SCALE
 		crt_image.alpha = 255
 		crt_image.mouse_opacity = 0
 		UpdateOverlays(crt_image, "crt")
@@ -83,38 +102,43 @@
 		if(!src.net_id)
 			src.net_id = generate_net_id(src)
 
+	disposing()
+		qdel(src.proxy)
+		src.proxy = null
+		. = ..()
+
+
 	// timed process
 	process()
 		if(status & NOPOWER)
-			ClearAllOverlays()
+			maptext = ""
+			src.ClearAllOverlays()
 			return
 
-		use_power(200)
+		..()
 
-		update()
+		src.update()
 
 
 	// set what is displayed
 	proc/update()
+		if(QDELETED(src))
+			return
 
 		switch(mode)
-			if(0)
+			if(STATUS_DISPLAY_BLANK)
 				maptext = ""
-				ClearAllOverlays()
+				src.ClearAllOverlays()
 
-			if(1)	// shuttle timer
-				if(emergency_shuttle.online)
+			if(STATUS_DISPLAY_SHUTTLE)
+				if(emergency_shuttle?.online)
 					var/displayloc
 					if(emergency_shuttle.location == SHUTTLE_LOC_STATION)
 						displayloc = "ETD "
 					else
 						displayloc = "ETA "
 
-					var/displaytime = get_shuttle_timer()
-					if(length(displaytime) > MAX_LEN)
-						displaytime = "**~**"
-
-					update_display_lines(displayloc, displaytime)
+					update_display_lines(displayloc, get_shuttle_timer())
 
 					if(repeat_update)
 						var/delay = src.base_tick_spacing * PROCESSING_TIER_MULTI(src)
@@ -124,6 +148,8 @@
 							for(var/i in 1 to iterations)
 								if(mode != 1 || repeat_update) // kill early if message or mode changed
 									break
+								if(QDELETED(src))
+									break
 								update()
 								if(i != iterations)
 									sleep(0.5 SECONDS) // set to update again in 5 ticks
@@ -131,7 +157,7 @@
 				else
 					set_picture("default")
 
-			if(2)
+			if(STATUS_DISPLAY_MESSAGE)
 				var/line1
 				var/line2
 				var/line_len = use_maptext ? 4 : 5
@@ -166,6 +192,37 @@
 						repeat_update = TRUE
 
 				update_display_lines(line1,line2)
+			if(STATUS_DISPLAY_MARKET)
+				update_display_lines("TRADE", get_market_timer())
+
+			if(STATUS_DISPLAY_NUCLEAR) // Nuclear Operative Bomb Armed!
+				if(QDELETED(src.the_bomb))
+					if(ticker.mode.type == /datum/game_mode/nuclear)
+						var/datum/game_mode/nuclear/game_mode = ticker.mode
+						src.the_bomb = game_mode.the_bomb
+					if(QDELETED(src.the_bomb))
+						for_by_tcl(nuke, /obj/machinery/nuclearbomb)
+							src.the_bomb = nuke
+							break
+					if(QDELETED(src.the_bomb))
+						src.mode = 1
+						return
+				if (!src.the_bomb?.armed)
+					set_picture("nuclear")
+					return
+				set_picture_with_text("nuclear", src.the_bomb.get_countdown_timer())
+				if(src.repeat_update)
+					var/delay = src.base_tick_spacing * PROCESSING_TIER_MULTI(src)
+					SPAWN(0.5 SECONDS)
+						src.repeat_update = FALSE
+						var/iterations = round(delay/5)
+						for(var/i in 1 to iterations)
+							if(mode != 7 || src.repeat_update) // kill early if message or mode changed
+								break
+							update()
+							if(i != iterations)
+								sleep(0.5 SECONDS) // set to update again in 5 ticks
+						src.repeat_update = TRUE
 
 		if(glow_in_dark_screen) // should re-add the glow if power is restored
 			screen_image.plane = PLANE_LIGHTING
@@ -194,6 +251,11 @@
 		lastdisplayline1 = null
 		lastdisplayline2 = null
 
+	/// Generate the time left text for our display
+	proc/timeleft_to_text(var/timeleft) // note ~ translates into a smaller :
+		. = "[add_zero(num2text((timeleft / 60) % 60),2)]~[add_zero(num2text(timeleft % 60), 2)]"
+		if(length(.) > MAX_LEN)
+			. = "**~**"
 #undef MAX_LEN
 
 	proc/set_maptext(var/line1, var/line2)
@@ -202,11 +264,25 @@
 		else
 			src.maptext = {"<span class='vm c' style="font-family: StatusDisp; font-size: 6px;  color: #09f">[line1]<BR/>[line2]</span>"}
 
+	proc/set_picture_with_text(var/state, var/newText)
+		var/image/previous = GetOverlayImage("picture")
+		if (previous?.icon_state != state)
+			src.maptext = ""
+			var/image/newImage = SafeGetOverlayImage("picture", src.icon, src.picture_state)
+			newImage.layer = src.layer + 0.1
+			newImage.blend_mode = BLEND_INSET_OVERLAY
+			UpdateOverlays(newImage, "picture")
+			UpdateOverlays(null, "overlay_image")
+			UpdateOverlays(crt_image, "crt")
+			src.picture_state = state
+		proxy.maptext = {"<span class='vm c' style="font-family: StatusDisp; font-size: 6px;  color: #fff">[newText]</span>"}
+
 	proc/set_picture(var/state)
 		var/image/previous = GetOverlayImage("picture")
 		if(previous?.icon_state == state)
 			return
 		src.maptext = ""
+		src.proxy.maptext = ""
 		picture_state = state
 		UpdateOverlays(image('icons/obj/status_display.dmi', icon_state=picture_state), "picture")
 		UpdateOverlays(null, "overlay_image")
@@ -218,6 +294,7 @@
 		if(previous_state?.icon_state == state && previous_overlay?.icon_state == overlay)
 			return
 		src.maptext = ""
+		src.proxy.maptext = ""
 		picture_state = state+overlay
 		UpdateOverlays(image('icons/obj/status_display.dmi', icon_state=state), "picture")
 		UpdateOverlays(image('icons/obj/status_display.dmi', icon_state=overlay), "overlay_image")
@@ -230,6 +307,7 @@
 		lastdisplayline1 = line1
 		lastdisplayline2 = line2
 
+		src.proxy.maptext = ""
 		set_maptext(line1, line2)
 
 		if(GetOverlayImage("picture") || GetOverlayImage("overlay_image") || !GetOverlayImage("crt"))
@@ -237,12 +315,19 @@
 			UpdateOverlays(null, "overlay_image")
 			UpdateOverlays(crt_image, "crt")
 
-	// return shuttle timer as text
+
+	/// Get text for next shipping market shift
+	proc/get_market_timer()
+		var/timeleft = shippingmarket.timeleft()
+		if(timeleft)
+			return src.timeleft_to_text(round(timeleft/10))
+		return ""
+
+	/// Get text for next emergency shuttle milestone (arriving, departing, centcom)
 	proc/get_shuttle_timer()
 		var/timeleft = emergency_shuttle.timeleft()
 		if(timeleft)
-			return "[add_zero(num2text((timeleft / 60) % 60),2)]~[add_zero(num2text(timeleft % 60), 2)]"
-			// note ~ translates into a smaller :
+			return src.timeleft_to_text(timeleft)
 		return ""
 
 	receive_signal(datum/signal/signal)
@@ -253,53 +338,67 @@
 			return
 
 		switch(signal.data["command"])
-			if("blank")
-				mode = 0
+			if(STATUS_DISPLAY_PACKET_MODE_DISPLAY_DEFAULT)
+				src.mode = initial(src.mode)
+				src.update()
 
-			if("shuttle")
-				mode = 1
-				repeat_update = TRUE
+			if(STATUS_DISPLAY_PACKET_MODE_DISPLAY_BLANK)
+				src.mode = STATUS_DISPLAY_BLANK
 
-			if("message")
-				mode = 2
-				set_message(strip_html(signal.data["msg1"]), strip_html(signal.data["msg2"]))
+			if(STATUS_DISPLAY_PACKET_MODE_DISPLAY_SHUTTLE)
+				src.mode = STATUS_DISPLAY_SHUTTLE
+				src.repeat_update = TRUE
 
-			if("alert")
-				mode = 3
-				set_picture(signal.data["picture_state"])
+			if(STATUS_DISPLAY_PACKET_MODE_MESSAGE)
+				src.mode = STATUS_DISPLAY_MESSAGE
+				src.set_message(strip_html(signal.data["msg1"]), strip_html(signal.data["msg2"]))
 
-			if("destruct")
-				if(display_type & 2)
-					mode = 5
+			if(STATUS_DISPLAY_PACKET_MODE_DISPLAY_ALERT)
+				src.mode = STATUS_DISPLAY_PICTURE
+				src.set_picture(signal.data["picture_state"])
+
+			if(STATUS_DISPLAY_PACKET_MODE_DISPLAY_MARKET)
+				src.mode = STATUS_DISPLAY_MARKET
+				src.repeat_update = TRUE
+
+			if(STATUS_DISPLAY_PACKET_MODE_DISPLAY_SELFDES)
+				if(src.zeta_selfdestruct)
+					src.mode = STATUS_DISPLAY_SELFDES
 					var/timeleft = signal.data["time"]
 					if(text2num(timeleft) <= 30)
-						set_picture_overlay("destruct_small", "d[timeleft]")
+						src.set_picture_overlay("destruct_small", "d[timeleft]")
 					else
-						set_picture("destruct")
+						src.set_picture("destruct")
 
+			if(STATUS_DISPLAY_PACKET_MODE_DISPLAY_NUCLEAR)
+				src.mode = STATUS_DISPLAY_NUCLEAR
+				src.repeat_update = TRUE
 
+/// Shows the time to market shift by default
+/obj/machinery/status_display/market
+	name = "market shift status display"
+	mode = STATUS_DISPLAY_MARKET
 
-/obj/machinery/status_display/supply_shuttle
-	name = "status display"
-
-
+/// Will show the zeta station self-destruct countdown
 /obj/machinery/status_display/research
-	name = "status display"
-	display_type = 2
+	zeta_selfdestruct = TRUE
 
 /obj/machinery/status_display/mining
 	name = "mining display"
-	mode = 6
+	mode = STATUS_DISPLAY_ROCKBOX
 
+TYPEINFO(/obj/machinery/ai_status_display)
+	mats = list("metal" = 2,
+				"conductive" = 6,
+				"crystal" = 6)
 /obj/machinery/ai_status_display
 	icon = 'icons/obj/status_display.dmi'
 	icon_state = "ai_frame"
 	name = "\improper AI display"
-	anchored = 1
+	anchored = ANCHORED
 	density = 0
-	mats = list("MET-1"=2, "CON-1"=6, "CRY-1"=6)
 	deconstruct_flags = DECON_SCREWDRIVER | DECON_WRENCH | DECON_CROWBAR | DECON_WELDER | DECON_MULTITOOL
-
+	power_usage = 200
 	machine_registry_idx = MACHINES_STATUSDISPLAYS
 	var/is_on = FALSE //Distinct from being powered
 
@@ -346,7 +445,7 @@
 			screen_glow.disable()
 			return
 		update()
-		use_power(200)
+		..()
 
 	proc/update()
 		//Update backing colour
@@ -359,18 +458,21 @@
 			screen_glow.set_color(colors[1] / 255, colors[2] / 255, colors[3] / 255)
 
 		//Update expression
-		if (src.emotion != owner.faceEmotion)
-			UpdateOverlays(owner.faceEmotion != "ai-tetris" ? glow_image : null, "glow_img")
-			face_image.icon_state = owner.faceEmotion
+		var/faceEmotion = owner.faceEmotion
+		if (isdead(owner))
+			faceEmotion = "ai_bsod"
+		if (src.emotion != faceEmotion)
+			UpdateOverlays(faceEmotion != "ai_tetris" ? glow_image : null, "glow_img")
+			face_image.icon_state = faceEmotion
 			UpdateOverlays(face_image, "emotion_img")
-			emotion = owner.faceEmotion
+			emotion = faceEmotion
 
 		//Re-enable all the stuff if we are powering on again
 		if (!screen_glow.enabled)
 			screen_glow.enable()
 			UpdateOverlays(face_image, "emotion_img")
 			UpdateOverlays(back_image, "back_img")
-			UpdateOverlays(owner.faceEmotion != "ai-tetris" ? glow_image : null, "glow_img")
+			UpdateOverlays(owner.faceEmotion != "ai_tetris" ? glow_image : null, "glow_img")
 
 		message = owner.status_message
 		name = initial(name) + " ([owner.name])"
@@ -385,7 +487,7 @@
 
 	attack_ai(mob/user as mob) //Captain said it's my turn on the status display
 		if (!isAI(user))
-			boutput(user, "<span class='alert'>Only an AI can claim this.</span>")
+			boutput(user, SPAN_ALERT("Only an AI can claim this."))
 			return
 		var/mob/living/silicon/ai/A = user
 		if (isAIeye(user))
@@ -393,7 +495,7 @@
 			A = AE.mainframe
 		if (owner == A) //no free updates for you
 			return
-		boutput(user, "<span class='notice'>You tune the display to your core.</span>")
+		boutput(user, SPAN_NOTICE("You tune the display to your core."))
 		owner = A
 		is_on = TRUE
 		if (!(status & NOPOWER))

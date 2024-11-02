@@ -3,10 +3,10 @@
 /obj/decal/cleanable/blood{
 	icon_state = "gib2"
 	},
-/obj/decal/fakeobjects/skeleton/decomposed_corpse{
+/obj/fakeobject/skeleton/decomposed_corpse{
 	icon_state = "clowncorpse"
 	},
-/obj/critter/spider/clown,
+/mob/living/critter/spider/clown,
 /turf/simulated/floor/carpet/arcade,
 /area/dmm_suite/clear_area)
 "n" = (

@@ -11,7 +11,7 @@
 	rarity_weight = 200
 	validtypes = list("martian","wizard","eldritch","precursor")
 	validtriggers = list(/datum/artifact_trigger/force,/datum/artifact_trigger/electric,/datum/artifact_trigger/heat,
-	/datum/artifact_trigger/radiation,/datum/artifact_trigger/carbon_touch)
+	/datum/artifact_trigger/radiation,/datum/artifact_trigger/carbon_touch, /datum/artifact_trigger/language)
 	fault_blacklist = list(ITEM_ONLY_FAULTS, TOUCH_ONLY_FAULTS) // can't sting you at range
 	activated = 0
 	activ_text = "begins to radiate a strange energy field!"
@@ -43,10 +43,10 @@
 		for (var/mob/living/carbon/M in range(O,src.field_radius))
 			if (src.field_type == ART_HARMING)
 				random_brute_damage(M, src.field_strength)
-				boutput(M, "<span class='alert'>Waves of painful energy wrack your body!</span>")
+				boutput(M, SPAN_ALERT("Waves of painful energy wrack your body!"))
 			else
 				M.HealDamage("All", src.field_strength, src.field_strength)
-				boutput(M, "<span class='notice'>Waves of soothing energy wash over you!</span>")
+				boutput(M, SPAN_NOTICE("Waves of soothing energy wash over you!"))
 			O.ArtifactFaultUsed(M)
 
 #undef ART_HEALING

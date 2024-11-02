@@ -9,6 +9,8 @@
 	var/net_id = null
 	var/control_frequency = "1461"
 	var/radiorange = 3
+	/// Was the armory authorized via authdisk?
+	var/authdisk_authorized = FALSE
 	desc = "Use this computer to authorize security access to the Armory. You need an ID with security access to do so."
 
 	light_r =1
@@ -18,16 +20,24 @@
 	var/authed = 0
 	var/area/armory_area
 
+	New()
+		..()
+		START_TRACKING
+
 	initialize()
 		armory_area = get_area_by_type(/area/station/ai_monitored/armory)
 
 		src.net_id = generate_net_id(src)
-		MAKE_DEFAULT_RADIO_PACKET_COMPONENT(null, control_frequency)
+		MAKE_DEFAULT_RADIO_PACKET_COMPONENT(src.net_id, null, control_frequency)
 
 		/*for (var/obj/machinery/door/airlock/D in armory_area)
-			if (D.has_access(access_maxsec))
+			if (D.has_access(access_armory))
 				D.no_access = 1
 		*/
+		..()
+
+	disposing()
+		STOP_TRACKING
 		..()
 
 	receive_signal(datum/signal/signal)
@@ -105,22 +115,37 @@
 			src.icon_state = "drawbr-alert"
 			src.UpdateIcon()
 
+	get_help_message()
+		if (src.authed)
+			. = "Three security personnel, or the Head of Security can revoke armory access."
+			if(!authdisk_authorized)
+				. += "<br>You can also use the <b>Authentication Disk</b> to issue an emergency revocation."
+		else
+			. = "Three security personnel, or the Head of Security, can authorize armory access."
+			if(!authdisk_authorized)
+				. += "<br>You can also use the <b>Authentication Disk</b> to issue an emergency override."
+
 	proc/authorize()
 		if(src.authed)
 			return
 
 		logTheThing(LOG_STATION, usr, "authorized armory access")
-		command_announcement("<br><b><span class='alert'>Armory weapons access has been authorized for all security personnel.</span></b>", "Security Level Increased", 'sound/misc/announcement_1.ogg')
+		message_ghosts("<b>Armory authorized [log_loc(src.loc, ghostjump=TRUE)].")
+		command_announcement("<br><b>[SPAN_ALERT("Armory weapons access has been authorized for all security personnel.")]</b>", "Security Level Increased", 'sound/misc/announcement_1.ogg')
 		authed = 1
 		src.ClearSpecificOverlays("screen_image")
 		src.icon_state = "drawbr-alert"
 		src.UpdateIcon()
 
+		ON_COOLDOWN(src, "unauth", 5 MINUTES)
+
 		src.authorized = null
 		src.authorized_registered = null
 
+		SEND_GLOBAL_SIGNAL(COMSIG_GLOBAL_ARMORY_AUTH)
+
 		for (var/obj/machinery/door/airlock/D in armory_area)
-			if (D.has_access(access_maxsec))
+			if (D.has_access(access_armory))
 				D.req_access = list(access_security)
 				//D.no_access = 0
 			LAGCHECK(LAG_REALTIME)
@@ -134,37 +159,47 @@
 
 				LAGCHECK(LAG_REALTIME)
 
+		SPAWN(0.5 SECONDS)
+			playsound(src, 'sound/vox/armory.ogg', 50, vary=FALSE, extrarange=10)
+			sleep(0.7 SECONDS)
+			playsound(src, 'sound/vox/authorized.ogg', 50, vary=FALSE, extrarange=10)
+
 	proc/unauthorize()
 		if(src.authed)
 
 			logTheThing(LOG_STATION, usr, "unauthorized armory access")
-			command_announcement("<br><b><span class='alert'>Armory weapons access has been revoked from all security personnel. All crew are advised to hand in riot gear to the Head of Security.</span></b>", "Security Level Decreased", "sound/misc/announcement_1.ogg")
+			command_announcement("<br><b>[SPAN_ALERT("Armory weapons access has been revoked from all security personnel. All crew are advised to hand in riot gear to the Head of Security.")]</b>", "Security Level Decreased", "sound/misc/announcement_1.ogg")
 			authed = 0
 			src.ClearSpecificOverlays("screen_image")
 			icon_state = "drawbr"
 			src.UpdateIcon()
 
+			src.authorized = null
+			src.authorized_registered = null
+
+			SEND_GLOBAL_SIGNAL(COMSIG_GLOBAL_ARMORY_UNAUTH)
+
 			for (var/obj/machinery/door/airlock/D in armory_area)
 				if (D.has_access(access_security))
-					D.req_access = list(access_maxsec)
+					D.req_access = list(access_armory)
 				LAGCHECK(LAG_REALTIME)
 
 			if (armory_area)
 				for(var/obj/O in armory_area)
 					if (istype(O,/obj/storage/secure/crate))
-						O.req_access = list(access_maxsec)
+						O.req_access = list(access_armory)
 					else if (istype(O,/obj/machinery/vending))
-						O.req_access = list(access_maxsec)
+						O.req_access = list(access_armory)
 
 				LAGCHECK(LAG_REALTIME)
 
 	proc/print_auth_needed(var/mob/author)
 		if (author)
 			for (var/mob/O in hearers(src, null))
-				O.show_message("<span class='subtle'><span class='game say'><span class='name'>[src]</span> beeps, \"[author] request accepted. [src.auth_need - src.authorized.len] authorizations needed until Armory is opened.\"</span></span>", 2)
+				O.show_message(SPAN_SUBTLE(SPAN_SAY("[SPAN_NAME("[src]")] beeps, \"[author] request accepted. [src.auth_need - src.authorized.len] authorizations needed until Armory is [src.authed ? "closed" : "opened"].\"")), 2)
 		else
 			for (var/mob/O in hearers(src, null))
-				O.show_message("<span class='subtle'><span class='game say'><span class='name'>[src]</span> beeps, \"[src.auth_need - src.authorized.len] authorizations needed until Armory is opened.\"</span></span>", 2)
+				O.show_message(SPAN_SUBTLE(SPAN_SAY("[SPAN_NAME("[src]")] beeps, \"[src.auth_need - src.authorized.len] authorizations needed until Armory is [src.authed ? "closed" : "opened"].\"")), 2)
 
 
 /obj/machinery/computer/riotgear/attack_hand(mob/user)
@@ -180,11 +215,25 @@
 	if (!user)
 		return
 
-	if (istype(W, /obj/item/device/pda2) && W:ID_card)
-		W = W:ID_card
-	if (!istype(W, /obj/item/card/id))
+	if (istype(W, /obj/item/disk/data/floppy/read_only/authentication))
+		if(src.authdisk_authorized)
+			boutput(user, SPAN_ALERT("Emergency armory authorizations cannot be cleared or reissued!"))
+			return
+		if(src.authed)
+			src.manual_unauthorize(user, null, TRUE)
+			return
+		var/emergency_auth = tgui_alert(user, "This cannot be undone by Authentication Disk!", "Authentication Warning", list("Emergency Authorization", "Cancel"))
+		if(emergency_auth == "Emergency Authorization" && in_interact_range(src, user) && equipped_or_holding(W, user))
+			src.authdisk_authorized = TRUE
+			src.authorize()
+		return
+
+	var/obj/item/card/id/id_card = get_id_card(W)
+
+	if (!istype(id_card, /obj/item/card/id))
 		boutput(user, "No ID given.")
 		return
+	W = id_card
 
 	if (!W:access) //no access
 		src.add_fingerprint(user)
@@ -202,28 +251,13 @@
 		boutput(user, "The access level of [W] is not high enough.")
 		return
 
-	if(authed && (!(access_maxsec in W:access)))
-		boutput(user, "Armory has already been authorized!")
-		return
-
-	if(authed && (access_maxsec in W:access))
-		var/choice = tgui_alert(user, "Would you like to unauthorize security's access to riot gear?", "Armory Unauthorization", list("Unauthorize", "No"))
-		if(BOUNDS_DIST(user, src) > 0) return
-		src.add_fingerprint(user)
-		if (choice == "Unauthorize")
-			if(GET_COOLDOWN(src, "unauth"))
-				boutput(user, "<span class='alert'> The armory computer cannot take your commands at the moment! Wait [GET_COOLDOWN(src, "unauth")/10] seconds!</span>")
-				playsound( src.loc, 'sound/machines/airlock_deny.ogg', 10, 0 )
-				return
-			if(!ON_COOLDOWN(src, "unauth", 5 MINUTES))
-				unauthorize()
-				playsound(src.loc, 'sound/machines/chime.ogg', 10, 1)
-				boutput(user,"<span class='notice'> The armory's equipments have returned to having their default access!</span>")
-		return
-
 	if (!src.authorized)
 		src.authorized = list()
 		src.authorized_registered = list()
+
+	if(authed)
+		src.manual_unauthorize(user, W)
+		return
 
 	var/choice = tgui_alert(user, "Would you like to authorize access to riot gear? [src.auth_need - length(src.authorized)] authorization\s are still needed.", "Armory Auth", list("Authorize", "Repeal"))
 	if(BOUNDS_DIST(user, src) > 0 || src.authed)
@@ -239,7 +273,7 @@
 			if (W:registered in src.authorized_registered)
 				boutput(user, "This ID has already issued an authorization! [src.auth_need - src.authorized.len] authorizations from others are still needed.")
 				return
-			if (access_maxsec in W:access)
+			if (access_armory in W:access)
 				authorize()
 				return
 
@@ -253,7 +287,8 @@
 				src.authorized += user //authorize by USER, not by registered ID. prevent the captain from printing out 3 unique ID cards and getting in by themselves.
 			src.authorized_registered += W:registered
 
-			if (src.authorized.len < auth_need)
+			if (length(src.authorized) < auth_need)
+				logTheThing(LOG_STATION, user, "added an approval for armory access using [W]. [length(src.authorized)] total approvals.")
 				print_auth_needed(user)
 			else
 				authorize()
@@ -266,5 +301,67 @@
 			else
 				src.authorized -= user
 			src.authorized_registered -= W:registered
+			logTheThing(LOG_STATION, user, "removed an approval for armory access using [W]. [length(src.authorized)] total approvals.")
+			print_auth_needed(user)
 
+/// Handles unauthorization from armory computer interaction
+/obj/machinery/computer/riotgear/proc/manual_unauthorize(mob/user, var/obj/item/W, var/is_auth_disk = FALSE)
+	if(GET_COOLDOWN(src, "unauth"))
+		boutput(user, SPAN_ALERT(" The armory computer cannot take your commands at the moment! Wait [GET_COOLDOWN(src, "unauth")/10] seconds!"))
+		playsound( src.loc, 'sound/machines/airlock_deny.ogg', 10, 0 )
+		return
+
+	// Basically the same as authing
+	var/choice = tgui_alert(user, "Would you like to revoke security's access to riot gear? [src.auth_need - length(src.authorized)] unauthorization\s are still needed.", "Armory Unauthorization", list("Unauthorize", "Repeal"))
+	if(BOUNDS_DIST(user, src) > 0 || !src.authed)
+		return
+	src.add_fingerprint(user)
+	if (!choice)
+		return
+	switch(choice)
+		if("Unauthorize")
+			if (is_auth_disk)
+				unauthorize()
+				playsound(src.loc, 'sound/machines/chime.ogg', 10, 1)
+				boutput(user,SPAN_NOTICE(" The armory's equipments have returned to having their default access!"))
+				return
+			if (user in src.authorized)
+				boutput(user, "You have already unauthorized! [src.auth_need - src.authorized.len] unauthorizations from others are still needed.")
+				return
+			if (W:registered in src.authorized_registered)
+				boutput(user, "This ID has already issued an unauthorization! [src.auth_need - src.authorized.len] unauthorizations from others are still needed.")
+				return
+			if (access_armory in W:access)
+				unauthorize()
+				playsound(src.loc, 'sound/machines/chime.ogg', 10, 1)
+				boutput(user,SPAN_NOTICE(" The armory's equipments have returned to having their default access!"))
+				return
+
+			if (ishuman(user))
+				var/mob/living/carbon/human/H = user
+				if (H.bioHolder.Uid in src.authorized)
+					boutput(user, "You have already unauthorized - fingerprints on file! [src.auth_need - src.authorized.len] unauthorizations from others are still needed.")
+					return
+				src.authorized += H.bioHolder.Uid
+			else
+				src.authorized += user
+			src.authorized_registered += W:registered
+
+			if (length(src.authorized) < auth_need)
+				logTheThing(LOG_STATION, user, "added an approval for revoking armory access using [W]. [length(src.authorized)] total approvals.")
+				print_auth_needed(user)
+			else
+				unauthorize()
+				playsound(src.loc, 'sound/machines/chime.ogg', 10, 1)
+				boutput(user,SPAN_NOTICE(" The armory's equipments have returned to having their default access!"))
+
+		if("Repeal")
+
+			if (ishuman(user))
+				var/mob/living/carbon/human/H = user
+				src.authorized -= H.bioHolder.Uid
+			else
+				src.authorized -= user
+			src.authorized_registered -= W:registered
+			logTheThing(LOG_STATION, user, "removed an approval for revoking armory access using [W]. [length(src.authorized)] total approvals.")
 			print_auth_needed(user)

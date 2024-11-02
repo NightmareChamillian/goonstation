@@ -12,16 +12,16 @@
 //Cyborgs /mob/living/silicon/robot  X
 
 /mob/living/intangible/aieye
-	name = "AI Eye"
+	name = "\improper AI eye"
 	icon = 'icons/mob/ai.dmi'
-	icon_state = "a-eye"
+	icon_state = "ai-eye"
 	density = 0
 	layer = 101
 	see_in_dark = SEE_DARK_FULL
-	stat = 0
+	stat = STAT_ALIVE
 	mob_flags = SEE_THRU_CAMERAS | USR_DIALOG_UPDATES_RANGE
 
-	can_lie = 0 //can't lie down, you're a floating ghostly eyeball
+	can_lie = FALSE //can't lie down, you're a floating ghostly eyeball
 	can_bleed = FALSE
 	metabolizes = FALSE
 	blood_id = null
@@ -47,36 +47,40 @@
 		APPLY_ATOM_PROPERTY(src, PROP_MOB_INVISIBILITY, src, INVIS_AI_EYE)
 		APPLY_ATOM_PROPERTY(src, PROP_MOB_EXAMINE_ALL_NAMES, src)
 		APPLY_ATOM_PROPERTY(src, PROP_MOB_NO_MOVEMENT_PUFFS, src)
+		APPLY_ATOM_PROPERTY(src, PROP_MOB_CANNOT_VOMIT, src)
 		if (render_special)
 			render_special.set_centerlight_icon("nightvision", rgb(0.5 * 255, 0.5 * 255, 0.5 * 255))
+		AddComponent(/datum/component/minimap_marker/minimap, MAP_AI, "ai_eye")
+
 	Login()
 		.=..()
 		src.client.show_popup_menus = 1
-		//if (src.client)
-		//	src.client.show_popup_menus = 0
-		for(var/key in aiImages)
-			var/image/I = aiImages[key]
-			src.client << I
-		SPAWN(0)
+		var/client_color = src.client.color
+		src.client.color = "#000000"
+		SPAWN(0) //let's try not hanging the entire server for 6 seconds every time an AI has wonky internet
+			if (!src.client) // just client things
+				return
+			src.client.images += aiImages
+			src.bioHolder.mobAppearance.pronouns = src.client.preferences.AH.pronouns
+			src.update_name_tag()
+			src.job = "AI"
+			if (src.mind)
+				src.mind.assigned_role = "AI"
+			animate(src.client, 0.3 SECONDS, color = client_color)
 			var/sleep_counter = 0
-			for(var/key in aiImagesLowPriority)
-				var/image/I = aiImagesLowPriority[key]
+			for(var/image/I as anything in aiImagesLowPriority)
 				src.client << I
 				if(sleep_counter++ % (300 * 10) == 0)
 					LAGCHECK(LAG_LOW)
 
 	Logout()
-		//if (src.client)
-		//	src.client.show_popup_menus = 1
 		var/client/cl = src.last_client
-		if(cl)
-			for(var/key in aiImages)
-				var/image/I = aiImages[key]
-				cl.images -= I
+		if (!cl)
+			return ..()
 		SPAWN(0)
+			cl?.images -= aiImages
 			var/sleep_counter = 0
-			for(var/key in aiImagesLowPriority)
-				var/image/I = aiImagesLowPriority[key]
+			for(var/image/I as anything in aiImagesLowPriority)
 				cl?.images -= I
 				if(sleep_counter++ % (300 * 10) == 0)
 					LAGCHECK(LAG_LOW)
@@ -99,7 +103,7 @@
 			C.apply_keybind("robot_tg")
 
 	process_move(keys)
-		if(keys && src.move_dir && !src.use_movement_controller && !istype(src.loc, /turf)) //when a movement key is pressed, move out of tracked mob
+		if(keys && src.move_dir && !src.override_movement_controller && !istype(src.loc, /turf)) //when a movement key is pressed, move out of tracked mob
 			var/mob/living/intangible/aieye/O = src
 			O.set_loc(get_turf(src))
 		. = ..()
@@ -144,7 +148,7 @@
 			while(!istype(temp.loc, /turf))
 				temp = temp.loc
 			UnregisterSignal(outer_eye_atom, COMSIG_MOVABLE_SET_LOC)
-			RegisterSignal(temp, COMSIG_MOVABLE_SET_LOC, .proc/check_eye_z)
+			RegisterSignal(temp, COMSIG_MOVABLE_SET_LOC, PROC_REF(check_eye_z))
 			outer_eye_atom = temp
 		else
 			UnregisterSignal(src.outer_eye_atom, COMSIG_MOVABLE_SET_LOC)
@@ -154,14 +158,24 @@
 	click(atom/target, params, location, control)
 		if (!src.mainframe) return
 
-		if (!src.mainframe.stat && !src.mainframe.restrained() && !src.mainframe.hasStatus(list("weakened", "paralysis", "stunned")))
+		var/in_ai_range = (get_z(mainframe) == get_z(target)) || (inunrestrictedz(target) && inonstationz(mainframe))
+
+		if (!src.mainframe.stat && !src.mainframe.restrained() && !src.mainframe.hasStatus(list("knockdown", "unconscious", "stunned")))
 			if(src.client.check_any_key(KEY_OPEN | KEY_BOLT | KEY_SHOCK) && istype(target, /obj) )
 				var/obj/O = target
-				O.receive_silicon_hotkey(src)
+				if(in_ai_range)
+					O.receive_silicon_hotkey(src)
+				else
+					src.show_text("Your mainframe was unable relay this command that far away!", "red")
 				return
 
 		//var/inrange = in_interact_range(target, src)
 		//var/obj/item/equipped = src.equipped()
+
+		if(src.client.check_any_key(KEY_OPEN) && istype(target, /mob/living/silicon))
+			var/mob/living/silicon/S = target
+			src.mainframe.deploy_to_shell(S)
+			return
 
 		if (!src.client.check_any_key(KEY_EXAMINE | KEY_OPEN | KEY_BOLT | KEY_SHOCK | KEY_POINT) ) // ugh
 			if (src.targeting_ability)
@@ -177,15 +191,15 @@
 			//var/turf/T = target
 			//boutput(world, "[T] [isturf(target)] [findtext(control, "map_viewport")] [control]")
 			if( isturf(target) && findtext(control, "map_viewport") )
-				set_loc(src, target)
+				src.set_loc(target)
 
 			if (GET_DIST(src, target) > 0)
 				src.set_dir(get_dir(src, target))
 
+			if(in_ai_range)
+				target.attack_ai(src, params, location, control)
 
-			target.attack_ai(src, params, location, control)
-
-		if (src.client.check_any_key(KEY_POINT))
+		if (src.client.check_any_key(KEY_POINT) && in_ai_range)
 			var/turf/T = get_turf(target)
 			mainframe.show_hologram_context(T)
 			return
@@ -241,7 +255,7 @@
 	say_understands(var/other)
 		if (ishuman(other))
 			var/mob/living/carbon/human/H = other
-			if (!H.mutantrace || !H.mutantrace.exclusive_language)
+			if (!H.mutantrace.exclusive_language)
 				return 1
 		if (isrobot(other))
 			return 1
@@ -255,7 +269,8 @@
 		if (src.mainframe)
 			src.mainframe.say(message)
 		else
-			visible_message("[CLEAN(src)] says, <b>[CLEAN(message)]</b>")
+			SEND_SIGNAL(src, COMSIG_MOB_SAY, message)
+			visible_message("[html_encode("[src]")] says, <b>[html_encode("[message]")]</b>")
 
 	say_radio()
 		src.mainframe.say_radio()
@@ -264,6 +279,7 @@
 		src.mainframe.say_main_radio(msg)
 
 	emote(var/act, var/voluntary = 0)
+		..()
 		if (mainframe)
 			mainframe.emote(act, voluntary)
 
@@ -273,9 +289,6 @@
 	resist()
 		return 0 //can't actually resist anything because there's nothing to resist, but maybe the hot key could be used for something?
 
-	vomit()
-		return 0 //can't puke
-
 	//death stuff that should be passed to mainframe
 	gib(give_medal, include_ejectables) //this should be admin only, I would hope
 		message_admins("something tried to gib the AI Eye - if this wasn't an admin action, something has gone badly wrong")
@@ -283,6 +296,11 @@
 		//return mainframe.gib(give_medal, include_ejectables) //re-enable this when you are SUPREMELY CONFIDENT that all calls to gib() have intangible checks
 
 
+	create_viewport(kind, title, size, share_planes)
+		if (length(src.client?.getViewportsByType(VIEWPORT_ID_AI)) >= src.mainframe.viewport_limit)
+			boutput(src, SPAN_ALERT("You lack the computing resources needed to open another viewport."))
+		else
+			. = ..()
 
 	proc/mainframe_check()
 		if (mainframe)
@@ -298,7 +316,7 @@
 		if (src.mainframe)
 			mainframe.show_laws(0, src)
 		else
-			boutput(src, "<span class='alert'>You lack a dedicated mainframe! This is a bug, report to an admin!</span>")
+			boutput(src, SPAN_ALERT("You lack a dedicated mainframe! This is a bug, report to an admin!"))
 		return
 
 	verb/cmd_return_mainframe()
@@ -314,7 +332,7 @@
 			mainframe.return_to(src)
 			update_statics()
 		else
-			boutput(src, "<span class='alert'>You lack a dedicated mainframe! This is a bug, report to an admin!</span>")
+			boutput(src, SPAN_ALERT("You lack a dedicated mainframe! This is a bug, report to an admin!"))
 		return
 
 	verb/ai_view_crew_manifest()
@@ -451,6 +469,12 @@
 		if(mainframe)
 			mainframe.deploy_to()
 
+	verb/toggle_lock()
+		set category = "AI Commands"
+		set name = "Toggle Cover Lock"
+		if(mainframe)
+			mainframe.toggle_lock()
+
 	verb/open_nearest_door()
 		set category = "AI Commands"
 		set name = "Open Nearest Door to..."
@@ -490,6 +514,12 @@
 		set desc = "Change your name."
 		mainframe?.rename_self()
 
+	verb/go_offline()
+		set category = "AI Commands"
+		set name = "Go Offline"
+		set desc = "Disconnect your brain such that a new AI can take your place."
+		mainframe?.go_offline()
+
 	stopObserving()
 		src.set_loc(get_turf(src))
 		src.observing = null
@@ -514,7 +544,7 @@
 	while(!istype(temp.loc, /turf))
 		temp = temp.loc
 	if(temp != source)
-		RegisterSignal(temp, COMSIG_MOVABLE_SET_LOC, .proc/check_eye_z)
+		RegisterSignal(temp, COMSIG_MOVABLE_SET_LOC, PROC_REF(check_eye_z))
 		UnregisterSignal(outer_eye_atom, COMSIG_MOVABLE_SET_LOC)
 		outer_eye_atom = temp
 

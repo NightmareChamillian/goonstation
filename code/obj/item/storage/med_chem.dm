@@ -6,16 +6,17 @@
 	icon_state = "firstaid1"
 	inhand_image_icon = 'icons/mob/inhand/hand_storage.dmi'
 	throw_speed = 2
+	can_hold = list(/obj/item/storage/pill_bottle)
 	throw_range = 8
-	max_wclass = W_CLASS_SMALL // medbot.dm modifies attackby() for firstaid, which effectively reduces max_wclass to 1, EXCEPT for non-chemmaster pill bottles
+	max_wclass = W_CLASS_TINY
+	check_wclass = TRUE
 	var/list/kit_styles = null
 
 	New()
 		..()
-		SPAWN(0.5 SECONDS)
-			if (length(kit_styles))
-				icon_state = pick(kit_styles)
-				item_state = icon_state
+		if (length(kit_styles))
+			icon_state = pick(kit_styles)
+			item_state = icon_state
 
 
 /obj/item/storage/firstaid/regular
@@ -134,9 +135,9 @@
 	name = "doctor's bag"
 	icon_state = "docbag1"
 	item_state = "docbag1"
-	desc = "A old-fashioned doctor's bag designed to cary medical and surgical supplies."
+	desc = "A old-fashioned doctor's bag designed to carry medical and surgical supplies."
 	kit_styles = list("docbag1", "docbag2", "docbag3")
-	spawn_contents = list(/obj/item/circular_saw, /obj/item/scalpel, /obj/item/scissors/surgical_scissors, /obj/item/suture, /obj/item/reagent_containers/syringe, /obj/item/reagent_containers/iv_drip/blood, /obj/item/medical/medicaldiagnosis/stethoscope)
+	spawn_contents = list(/obj/item/circular_saw, /obj/item/scalpel, /obj/item/scissors/surgical_scissors, /obj/item/suture, /obj/item/reagent_containers/syringe, /obj/item/reagent_containers/iv_drip/blood, /obj/item/medicaldiagnosis/stethoscope)
 
 /* -------------------- First Aid Kits - VR -------------------- */
 
@@ -282,7 +283,7 @@
 	eye_normal
 		name = "ocular prosthesis kit"
 		desc = "A box containing a pair of cybereyes."
-		spawn_contents = list(/obj/item/organ/eye/cyber = 2,\
+		spawn_contents = list(/obj/item/organ/eye/cyber/configurable = 2,\
 		/obj/item/surgical_spoon = 1)
 
 	eye_sunglasses
@@ -351,11 +352,11 @@
 		spawn_contents = list(/obj/item/surgical_spoon = 1)
 		make_my_stuff()
 			..()
-			var/list/eyez = typesof(/obj/item/organ/eye/cyber)
+			var/list/eyez = childrentypesof(/obj/item/organ/eye/cyber/configurable)
 			if (eyez.len)
 				for (var/i=rand(2,3), i>0, i--)
 					var/epath = pick(eyez)
-					new epath(src)
+					src.storage.add_contents(new epath(src))
 
 /* -------------------- Wall Storage -------------------- */
 
@@ -369,25 +370,25 @@
 
 	make_my_stuff()
 		..()
-		new /obj/item/bandage(src)
-		new /obj/item/storage/pill_bottle/salicylic_acid(src)
-		new /obj/item/storage/pill_bottle/menthol(src)
+		src.storage.add_contents(new /obj/item/bandage(src))
+		src.storage.add_contents(new /obj/item/storage/pill_bottle/salicylic_acid(src))
+		src.storage.add_contents(new /obj/item/storage/pill_bottle/menthol(src))
 
 		if (prob(40))
-			new /obj/item/storage/firstaid/regular(src)
+			src.storage.add_contents(new /obj/item/storage/firstaid/regular(src))
 		if (prob(40))
-			new /obj/item/reagent_containers/glass/bottle/ethanol(src)
+			src.storage.add_contents(new /obj/item/reagent_containers/glass/bottle/ethanol(src))
 
 		switch (weighted_pick(list("gloves" = 20, "mask" = 20, "autoinjector" = 10, "both" = 10)))
 			if ("gloves")
-				new /obj/item/clothing/gloves/latex(src)
+				src.storage.add_contents(new /obj/item/clothing/gloves/latex(src))
 			if ("mask")
-				new /obj/item/clothing/mask/surgical(src)
+				src.storage.add_contents(new /obj/item/clothing/mask/surgical(src))
 			if ("autoinjector")
-				new /obj/item/reagent_containers/emergency_injector/spaceacillin(src)
+				src.storage.add_contents(new /obj/item/reagent_containers/emergency_injector/spaceacillin(src))
 			if ("both")
-				new /obj/item/clothing/gloves/latex(src)
-				new /obj/item/clothing/mask/surgical(src)
+				src.storage.add_contents(new /obj/item/clothing/gloves/latex(src))
+				src.storage.add_contents(new /obj/item/clothing/mask/surgical(src))
 
 /* -------------------- Pill Bottles - Medical -------------------- */
 
@@ -436,6 +437,11 @@
 	desc = "Contains pills used induce emesis."
 	spawn_contents = list(/obj/item/reagent_containers/pill/ipecac = 7)
 
+/obj/item/storage/pill_bottle/mannitol
+	name = "pill bottle (mannitol)"
+	desc = "Contains pills used to treat... brain damage."
+	spawn_contents = list(/obj/item/reagent_containers/pill/mannitol = 7)
+
 /* -------------------- Pill Bottles - Drugs -------------------- */
 
 /obj/item/storage/pill_bottle/methamphetamine
@@ -472,7 +478,7 @@
 /obj/item/storage/pill_bottle/suicide(var/mob/user as mob)
 	if (!src.user_can_suicide(user))
 		return 0
-	user.visible_message("<span class='alert'><b>[user] swallows [src] whole and begins to choke!</b></span>")
+	user.visible_message(SPAN_ALERT("<b>[user] swallows [src] whole and begins to choke!</b>"))
 	user.take_oxygen_deprivation(175)
 	qdel(src)
 	return 1

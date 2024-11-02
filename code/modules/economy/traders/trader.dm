@@ -10,13 +10,24 @@
 	var/chance_arrive = 45      // Chance for a trader to stop hiding during a market shift
 	var/asshole = 0 // will accept wrong-direction haggles
 
+	///A business card or other item type to occasionally include with orders
+	var/business_card = null
+	var/business_card_chance = 20
+
 	// lists of commodity datums that the trader will buy or sell, and the cart
 	// these are the base lists of commodities this trader will have
 	var/list/base_goods_buy = list()
 	var/list/base_goods_sell = list()
-	// these are the max amount of entries the trader will have on each list
-	var/max_goods_buy = 1
-	var/max_goods_sell = 1
+
+	// The rarities used to iterate over
+	var/rarities = list(TRADER_RARITY_COMMON, TRADER_RARITY_UNCOMMON, TRADER_RARITY_RARE)
+	// list to determine how many items per rarity we have
+	// it's cumulative, meaning we will have at least X common, Y uncommon, etc.
+	var/list/amount_of_items_per_rarity = list(
+		TRADER_RARITY_COMMON = 3,
+		TRADER_RARITY_UNCOMMON = 2,
+		TRADER_RARITY_RARE = 1,
+	)
 	// and these three are the active ones used for gameplay
 	var/list/goods_buy = list()
 	var/list/goods_sell = list()
@@ -86,10 +97,6 @@
 		..()
 		src.current_message = pick(src.dialogue_greet)
 		src.patience = rand(src.base_patience[1],src.base_patience[2])
-		if (src.max_goods_buy > src.base_goods_buy.len)
-			src.max_goods_buy = length(src.base_goods_buy)
-		if (src.max_goods_sell > src.base_goods_sell.len)
-			src.max_goods_sell = length(src.base_goods_sell)
 		src.set_up_goods()
 
 	proc/set_up_goods()
@@ -100,26 +107,23 @@
 		src.wipe_cart()
 
 		var/list/goods_buy_temp = list()
-		goods_buy_temp |= base_goods_buy
+		goods_buy_temp = base_goods_buy
 		var/list/goods_sell_temp = list()
-		goods_sell_temp |= base_goods_sell
+		goods_sell_temp = base_goods_sell
 
-		var/howmanybuy = rand(1,src.max_goods_buy)
-		while(howmanybuy > 0)
-			howmanybuy--
-			var/the_commodity = pick(goods_buy_temp)
-			var/datum/commodity/COM = new the_commodity(src)
-			src.goods_buy += COM
-			goods_buy_temp -= the_commodity
-
-		var/howmanysell = rand(1,src.max_goods_sell)
-		while(howmanysell > 0)
-			howmanysell--
-			var/the_commodity = pick(goods_sell_temp)
-			var/datum/commodity/COM = new the_commodity(src)
-			if(COM.type == /datum/commodity) logTheThing(LOG_DEBUG, src, "<B>SpyGuy/Traders:</B> [src] got a /datum/commodity when trying to set up stock with [the_commodity]")
-			src.goods_sell += COM
-			goods_sell_temp -= the_commodity
+		// Iterate over all rarities and pick the corresponding amount of items from the respective lists
+		for (var/rarity in src.rarities)
+			for (var/i in 1 to src.amount_of_items_per_rarity[rarity])
+				if(length(goods_buy_temp[rarity]) >= i)
+					var/buy_com = pick(goods_buy_temp[rarity])
+					var/datum/commodity/new_buy_com = new buy_com(src)
+					src.goods_buy += new_buy_com
+					goods_buy_temp[rarity] -= buy_com
+				if(length(goods_sell_temp[rarity]) >= i)
+					var/sell_com = pick(goods_sell_temp[rarity])
+					var/datum/commodity/new_sell_com = new sell_com(src)
+					src.goods_sell += new_sell_com
+					goods_sell_temp[rarity] -= sell_com
 
 	proc/haggle(var/datum/commodity/goods,var/askingprice,var/buying = 0)
 		// if something's gone wrong and there's no input, reject the haggle
@@ -183,6 +187,9 @@
 		invoice.name = "Sale Invoice ([src.name])"
 		invoice.info = "Invoice of Sale from [src.name]<br><br>"
 
+		if (src.business_card && prob(src.business_card_chance))
+			new src.business_card(S)
+
 		var/total_price = 0
 		for (var/datum/commodity/trader/C in src.shopping_cart)
 			if (!C.comtype || C.amount < 1) continue
@@ -214,7 +221,7 @@
 			src.shopping_cart -= COM
 		src.shopping_cart.Cut()
 
-/datum/commodity/trader/
+/datum/commodity/trader
 	var/listed_name = "a thing!!!"   // What it shows up as outside the shopping cart
 	var/list/possible_names = list() // List of names the trader will call this commodity
 	var/list/possible_alt_types = list() // List of things this trade can be other than the base path
@@ -232,5 +239,5 @@
 		src.price = rand(src.price_boundary[1],src.price_boundary[2])
 		src.baseprice = price
 
-/datum/commodity/trader/incart/
+/datum/commodity/trader/incart
 	var/datum/commodity/reference = null

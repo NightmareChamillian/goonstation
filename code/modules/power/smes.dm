@@ -17,7 +17,7 @@
 	desc = "The XIANG|GIESEL model '電母' high-capacity superconducting magnetic energy storage (SMES) unit. Acts as a giant capacitor for facility power grids, soaking up extra power or dishing it out."
 	icon_state = "smes"
 	density = 1
-	anchored = 1
+	anchored = ANCHORED
 	requires_power = FALSE
 	var/output = 30000
 	var/lastout = 0
@@ -37,7 +37,7 @@
 		. = {"It's [online ? "on" : "off"]line. [charging ? "It's charging, and it" : "It"] looks about [round(charge / capacity * 100, 20)]% full."}
 
 /obj/machinery/power/smes/construction
-	New(var/turf/iloc, var/idir = 2)
+	New(var/turf/iloc, var/idir = SOUTH)
 		if (!isturf(iloc))
 			qdel(src)
 		set_dir(idir)
@@ -73,6 +73,12 @@
 					if (term?.dir == turn(d, 180))
 						terminal = term
 						break dir_loop
+
+		AddComponent(/datum/component/mechanics_holder)
+		SEND_SIGNAL(src,COMSIG_MECHCOMP_ADD_INPUT,"Toggle Power Input", PROC_REF(_toggle_input_mechchomp))
+		SEND_SIGNAL(src,COMSIG_MECHCOMP_ADD_INPUT,"Set Power Input", PROC_REF(_set_input_mechchomp))
+		SEND_SIGNAL(src,COMSIG_MECHCOMP_ADD_INPUT,"Togle Power Output", PROC_REF(_toggle_output_mechchomp))
+		SEND_SIGNAL(src,COMSIG_MECHCOMP_ADD_INPUT,"Set Power Output", PROC_REF(_set_output_mechchomp))
 
 		if (!terminal)
 			status |= BROKEN
@@ -110,6 +116,28 @@
 /obj/machinery/power/smes/proc/chargedisplay()
 	return round(5.5*charge/capacity)
 
+/obj/machinery/power/smes/proc/_toggle_input_mechchomp()
+	src.chargemode = !src.chargemode
+	if (!chargemode)
+		charging = 0
+	src.UpdateIcon()
+
+/obj/machinery/power/smes/proc/_set_input_mechchomp(var/datum/mechanicsMessage/inp)
+	if(!length(inp.signal)) return
+	var/newinput = text2num(inp.signal)
+	if(newinput != src.chargelevel && isnum_safe(newinput))
+		src.chargelevel = clamp((newinput), 0 , SMESMAXCHARGELEVEL)
+
+/obj/machinery/power/smes/proc/_toggle_output_mechchomp()
+	src.online = !src.online
+	src.UpdateIcon()
+
+/obj/machinery/power/smes/proc/_set_output_mechchomp(var/datum/mechanicsMessage/inp)
+	if(!length(inp.signal)) return
+	var/newoutput = text2num(inp.signal)
+	if(newoutput != src.output && isnum_safe(newoutput))
+		src.output = clamp((newoutput), 0 , SMESMAXCHARGELEVEL)
+
 /obj/machinery/power/smes/process(mult)
 
 	if (status & BROKEN)
@@ -123,33 +151,7 @@
 
 	// Had to revert a hack here that caused SMES to continue charging despite insufficient power coming in on the input (terminal) side.
 	if (terminal)
-		var/excess = terminal.surplus()
-		var/load = 0
-		if (charging)
-			if (excess >= 0)		// if there's power available, try to charge
-
-				load = min(capacity-charge, chargelevel)		// charge at set rate, limited to spare capacity
-
-				// Adjusting mult to other power sources would likely cause more harm than good as it would cause unusual surges
-				// of power that would only be noticed though hotwire or be unrationalizable to player.  This will extrapolate power
-				// benefits to charged value so that minimal loss occurs.
-				charge += load * mult	// increase the charge
-				add_load(load)		// add the load to the terminal side network
-
-			else					// if not enough capcity
-				charging = 0		// stop charging
-				chargecount  = 0
-
-		else if (chargemode)
-			if (chargecount > 2)
-				charging = 1
-				chargecount = 0
-			else if (excess >= chargelevel)
-				chargecount++
-			else
-				chargecount = 0
-
-		lastexcess = load + excess
+		charge(mult)
 
 	if (online)		// if outputting
 		if (prob(5))
@@ -169,7 +171,37 @@
 	if (last_disp != chargedisplay() || last_chrg != charging || last_onln != online)
 		UpdateIcon()
 
+	SEND_SIGNAL(src,COMSIG_MECHCOMP_TRANSMIT_SIGNAL, "output=[src.output]&outputting=[src.online]&charge=[src.chargelevel]&charging=[src.chargemode]")
 	src.updateDialog()
+
+/obj/machinery/power/smes/proc/charge(mult)
+	var/excess = terminal.surplus()
+	var/load = 0
+	if (charging)
+		if (excess >= 0)		// if there's power available, try to charge
+
+			load = min(capacity-charge, chargelevel)		// charge at set rate, limited to spare capacity
+
+			// Adjusting mult to other power sources would likely cause more harm than good as it would cause unusual surges
+			// of power that would only be noticed though hotwire or be unrationalizable to player.  This will extrapolate power
+			// benefits to charged value so that minimal loss occurs.
+			if(terminal.add_load(load))			// add the load to the terminal side network
+				charge += load * mult	// increase the charge if successful
+
+		else					// if not enough capcity
+			charging = 0		// stop charging
+			chargecount  = 0
+
+	else if (chargemode)
+		if (chargecount > 2)
+			charging = 1
+			chargecount = 0
+		else if (excess >= chargelevel)
+			chargecount++
+		else
+			chargecount = 0
+
+	lastexcess = load + excess
 
 // called after all power processes are finished
 // restores charge level to smes if there was excess this ptick
@@ -178,7 +210,7 @@
 	if (status & BROKEN)
 		return
 
-	if (!online)
+	if (!online || isnull(powernet))
 		loaddemand = 0
 		return
 
@@ -199,15 +231,6 @@
 
 	if (clev != chargedisplay())
 		UpdateIcon()
-
-
-///obj/machinery/power/smes/add_avail(var/amount)
-//	if (terminal?.powernet)
-//		terminal.powernet.newavail += amount
-
-/obj/machinery/power/smes/add_load(var/amount)
-	if (terminal?.powernet)
-		terminal.powernet.newload += amount
 
 /obj/machinery/power/smes/ui_interact(mob/user, datum/tgui/ui)
 	ui = tgui_process.try_update_ui(user, src, ui)
@@ -287,6 +310,53 @@
 	var/rate = "[href]=-[Max]'>-</A>[href]=-[Min]'>-</A> [(C?C : 0)] [href]=[Min]'>+</A>[href]=[Max]'>+</A>"
 	if (Limit) return "[href]=-[Limit]'>-</A>"+rate+"[href]=[Limit]'>+</A>"
 	return rate
+
+/obj/machinery/power/smes/smart
+	name = "Dianmu smart power storage unit"
+	icon_state = "smes_smart"
+	capacity = 1e7
+	charge = 15e5
+
+
+/obj/machinery/power/smes/smart/charge(mult)
+	var/excess = terminal.surplus()
+	var/load = 0
+	if (charging)
+		if (excess >= 0)		// if there's power available, try to charge
+
+			load = min(capacity-charge, chargelevel)		// charge at set rate, limited to spare capacity
+
+			// Adjusting mult to other power sources would likely cause more harm than good as it would cause unusual surges
+			// of power that would only be noticed though hotwire or be unrationalizable to player.  This will extrapolate power
+			// benefits to charged value so that minimal loss occurs.
+			if(terminal.add_load(load))			// attempt to add the load to the terminal side network
+				charge += load * mult	// increase the charge if successful
+
+			// Simulate bad PID
+			var/adjust = 0
+			if(excess < 15 KILO WATTS)
+				adjust = -5 KILO WATTS
+			if(excess > 30 KILO WATTS)
+				adjust = 5 KILO WATTS
+			if(adjust)
+				adjust += rand(-3 KILO WATTS, 3 KILO WATTS)
+				src.chargelevel = clamp((src.chargelevel + adjust), 0 , SMESMAXCHARGELEVEL)
+		else					// if not enough capcity
+			charging = 0		// stop charging
+			chargecount  = 0
+			src.chargelevel = round(chargelevel*0.7)
+
+	else if (chargemode)
+		if (chargecount > 1)
+			charging = 1
+			chargecount = 0
+		else if (excess >= chargelevel)
+			chargecount++
+		else
+			chargecount = 0
+			src.chargelevel = round(chargelevel*0.5)
+
+	lastexcess = load + excess
 
 #undef SMESMAXCHARGELEVEL
 #undef SMESMAXOUTPUT

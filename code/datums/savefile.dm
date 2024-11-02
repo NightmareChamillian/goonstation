@@ -62,6 +62,7 @@
 		F["[profileNum]_flavor_text"] << src.flavor_text
 		F["[profileNum]_medical_note"] << src.medical_note
 		F["[profileNum]_security_note"] << src.security_note
+		F["[profileNum]_synd_int_note"] << src.synd_int_note
 
 		// Randomize appearances
 		F["[profileNum]_name_is_always_random"] << src.be_random_name
@@ -71,14 +72,14 @@
 		if (src.AH)
 			F["[profileNum]_pronouns"] << (isnull(AH.pronouns) ? "" : AH.pronouns.name)
 			F["[profileNum]_eye_color"] << AH.e_color
-			F["[profileNum]_hair_color"] << AH.customization_first_color
-			F["[profileNum]_facial_color"] << AH.customization_second_color
-			F["[profileNum]_detail_color"] << AH.customization_third_color
+			F["[profileNum]_hair_color"] << AH.customizations["hair_bottom"].color
+			F["[profileNum]_facial_color"] << AH.customizations["hair_middle"].color
+			F["[profileNum]_detail_color"] << AH.customizations["hair_top"].color
 			F["[profileNum]_skin_tone"] << AH.s_tone
 			F["[profileNum]_special_style"] << AH.special_style
-			F["[profileNum]_hair_style_name"] << AH.customization_first
-			F["[profileNum]_facial_style_name"] << AH.customization_second
-			F["[profileNum]_detail_style_name"] << AH.customization_third
+			F["[profileNum]_hair_style_name"] << AH.customizations["hair_bottom"].style
+			F["[profileNum]_facial_style_name"] << AH.customizations["hair_middle"].style
+			F["[profileNum]_detail_style_name"] << AH.customizations["hair_top"].style
 			F["[profileNum]_underwear_style_name"] << AH.underwear
 			F["[profileNum]_underwear_color"] << AH.u_color
 
@@ -92,6 +93,7 @@
 		F["[profileNum]_be_syndicate_commander"] << src.be_syndicate_commander
 		F["[profileNum]_be_spy"] << src.be_spy
 		F["[profileNum]_be_gangleader"] << src.be_gangleader
+		F["[profileNum]_be_gangmember"] << src.be_gangmember
 		F["[profileNum]_be_revhead"] << src.be_revhead
 		F["[profileNum]_be_changeling"] << src.be_changeling
 		F["[profileNum]_be_wizard"] << src.be_wizard
@@ -102,25 +104,26 @@
 		F["[profileNum]_be_blob"] << src.be_blob
 		F["[profileNum]_be_conspirator"] << src.be_conspirator
 		F["[profileNum]_be_flock"] << src.be_flock
+		F["[profileNum]_be_salvager"] << src.be_salvager
 		F["[profileNum]_be_misc"] << src.be_misc
 
 		// UI settings. Ehhhhh.
 		F["[profileNum]_hud_style"] << src.hud_style
 		F["[profileNum]_tcursor"] << src.target_cursor
 
-		if(src.traitPreferences.isValid())
+		if(src.traitPreferences.isValid(src.traitPreferences.traits_selected, src.custom_parts))
 			F["[profileNum]_traits"] << src.traitPreferences.traits_selected
-
-
-
+			F["[profileNum]_custom_parts"] << src.custom_parts
 		// Global options
 		F["tooltip"] << (src.tooltip_option ? src.tooltip_option : TOOLTIP_ALWAYS)
+		F["scrollwheel_limb_targeting"] << src.scrollwheel_limb_targeting
 		F["changelog"] << src.view_changelog
 		F["score"] << src.view_score
 		F["tickets"] << src.view_tickets
 		F["sounds"] << src.admin_music_volume
 		F["radio_sounds"] << src.radio_music_volume
 		F["clickbuffer"] << src.use_click_buffer
+		F["help_text_in_examine"] << src.help_text_in_examine
 		F["font_size"] << src.font_size
 
 		F["see_mentor_pms"] << src.see_mentor_pms
@@ -132,6 +135,9 @@
 		F["flying_chat_hidden"] << src.flying_chat_hidden
 		F["auto_capitalization"] << src.auto_capitalization
 		F["local_deachat"] << src.local_deadchat
+
+		F["tgui_fancy"] << src.tgui_fancy
+		F["tgui_lock"] << src.tgui_lock
 
 		if (returnSavefile)
 			return F
@@ -226,6 +232,7 @@
 		F["[profileNum]_flavor_text"] >> src.flavor_text
 		F["[profileNum]_medical_note"] >> src.medical_note
 		F["[profileNum]_security_note"] >> src.security_note
+		F["[profileNum]_synd_int_note"] >> src.synd_int_note
 
 		// Randomization options
 		F["[profileNum]_name_is_always_random"] >> src.be_random_name
@@ -241,35 +248,36 @@
 					AH.pronouns = pronouns
 					break
 			F["[profileNum]_eye_color"] >> AH.e_color
-			F["[profileNum]_hair_color"] >> AH.customization_first_color
-			F["[profileNum]_hair_color"] >> AH.customization_first_color_original
-			F["[profileNum]_facial_color"] >> AH.customization_second_color
-			F["[profileNum]_facial_color"] >> AH.customization_second_color_original
-			F["[profileNum]_detail_color"] >> AH.customization_third_color
-			F["[profileNum]_detail_color"] >> AH.customization_third_color_original
+			F["[profileNum]_hair_color"] >> AH.customizations["hair_bottom"].color
+			F["[profileNum]_hair_color"] >> AH.customizations["hair_bottom"].color_original
+			F["[profileNum]_facial_color"] >> AH.customizations["hair_middle"].color
+			F["[profileNum]_facial_color"] >> AH.customizations["hair_middle"].color_original
+			F["[profileNum]_detail_color"] >> AH.customizations["hair_top"].color
+			F["[profileNum]_detail_color"] >> AH.customizations["hair_top"].color_original
 			F["[profileNum]_skin_tone"] >> AH.s_tone
 			F["[profileNum]_skin_tone"] >> AH.s_tone_original
 			F["[profileNum]_special_style"] >> AH.special_style
-			F["[profileNum]_hair_style_name"] >> AH.customization_first
-			F["[profileNum]_hair_style_name"] >> AH.customization_first_original
-			F["[profileNum]_facial_style_name"] >> AH.customization_second
-			F["[profileNum]_facial_style_name"] >> AH.customization_second_original
-			F["[profileNum]_detail_style_name"] >> AH.customization_third
-			F["[profileNum]_detail_style_name"] >> AH.customization_third_original
+			F["[profileNum]_hair_style_name"] >> AH.customizations["hair_bottom"].style
+			F["[profileNum]_hair_style_name"] >> AH.customizations["hair_bottom"].style_original
+			F["[profileNum]_facial_style_name"] >> AH.customizations["hair_middle"].style
+			F["[profileNum]_facial_style_name"] >> AH.customizations["hair_middle"].style_original
+			F["[profileNum]_detail_style_name"] >> AH.customizations["hair_top"].style
+			F["[profileNum]_detail_style_name"] >> AH.customizations["hair_top"].style_original
 			F["[profileNum]_underwear_style_name"] >> AH.underwear
 			F["[profileNum]_underwear_color"] >> AH.u_color
-			if(!istype(src.AH.customization_first,/datum/customization_style))
-				src.AH.customization_first = find_style_by_name(src.AH.customization_first)
-			if(!istype(src.AH.customization_second,/datum/customization_style))
-				src.AH.customization_second = find_style_by_name(src.AH.customization_second)
-			if(!istype(src.AH.customization_third,/datum/customization_style))
-				src.AH.customization_third = find_style_by_name(src.AH.customization_third)
-			if(!istype(src.AH.customization_first_original,/datum/customization_style))
-				src.AH.customization_first_original = find_style_by_name(src.AH.customization_first_original)
-			if(!istype(src.AH.customization_second_original,/datum/customization_style))
-				src.AH.customization_second_original = find_style_by_name(src.AH.customization_second_original)
-			if(!istype(src.AH.customization_third_original,/datum/customization_style))
-				src.AH.customization_third_original = find_style_by_name(src.AH.customization_third_original)
+
+			if(!istype(src.AH.customizations["hair_bottom"].style, /datum/customization_style))
+				src.AH.customizations["hair_bottom"].style = find_style_by_name(src.AH.customizations["hair_bottom"].style, no_gimmick_hair=TRUE)
+			if(!istype(src.AH.customizations["hair_middle"].style, /datum/customization_style))
+				src.AH.customizations["hair_middle"].style = find_style_by_name(src.AH.customizations["hair_middle"].style, no_gimmick_hair=TRUE)
+			if(!istype(src.AH.customizations["hair_top"].style, /datum/customization_style))
+				src.AH.customizations["hair_top"].style = find_style_by_name(src.AH.customizations["hair_top"].style, no_gimmick_hair=TRUE)
+			if(!istype(src.AH.customizations["hair_bottom"].style_original, /datum/customization_style))
+				src.AH.customizations["hair_bottom"].style_original = find_style_by_name(src.AH.customizations["hair_bottom"].style_original, no_gimmick_hair=TRUE)
+			if(!istype(src.AH.customizations["hair_middle"].style_original, /datum/customization_style))
+				src.AH.customizations["hair_middle"].style_original = find_style_by_name(src.AH.customizations["hair_middle"].style_original, no_gimmick_hair=TRUE)
+			if(!istype(src.AH.customizations["hair_top"].style_original, /datum/customization_style))
+				src.AH.customizations["hair_top"].style_original = find_style_by_name(src.AH.customizations["hair_top"].style_original, no_gimmick_hair=TRUE)
 
 		// Job prefs
 		F["[profileNum]_job_prefs_1"] >> src.job_favorite
@@ -281,6 +289,7 @@
 		F["[profileNum]_be_syndicate_commander"] >> src.be_syndicate_commander
 		F["[profileNum]_be_spy"] >> src.be_spy
 		F["[profileNum]_be_gangleader"] >> src.be_gangleader
+		F["[profileNum]_be_gangmember"] >> src.be_gangmember
 		F["[profileNum]_be_revhead"] >> src.be_revhead
 		F["[profileNum]_be_changeling"] >> src.be_changeling
 		F["[profileNum]_be_wizard"] >> src.be_wizard
@@ -291,6 +300,7 @@
 		F["[profileNum]_be_blob"] >> src.be_blob
 		F["[profileNum]_be_conspirator"] >> src.be_conspirator
 		F["[profileNum]_be_flock"] >> src.be_flock
+		F["[profileNum]_be_salvager"] >> src.be_salvager
 		F["[profileNum]_be_misc"] >> src.be_misc
 
 		// UI settings...
@@ -298,16 +308,23 @@
 		F["[profileNum]_tcursor"] >> src.target_cursor
 
 		F["[profileNum]_traits"] >> src.traitPreferences.traits_selected
+		F["[profileNum]_custom_parts"] >> src.custom_parts
 
 
 		// Game setting options, not per-profile
 		F["tooltip"] >> src.tooltip_option
+		F["scrollwheel_limb_targeting"] >> src.scrollwheel_limb_targeting
+		if (isnull(src.scrollwheel_limb_targeting))
+			src.scrollwheel_limb_targeting = SCROLL_TARGET_ALWAYS
 		F["changelog"] >> src.view_changelog
 		F["score"] >> src.view_score
 		F["tickets"] >> src.view_tickets
 		F["sounds"] >> src.admin_music_volume
 		F["radio_sounds"] >> src.radio_music_volume
 		F["clickbuffer"] >> src.use_click_buffer
+		F["help_text_in_examine"] >> src.help_text_in_examine
+		if (isnull(src.help_text_in_examine))
+			src.help_text_in_examine = TRUE
 		F["font_size"] >> src.font_size
 
 		F["see_mentor_pms"] >> src.see_mentor_pms
@@ -319,6 +336,13 @@
 		F["flying_chat_hidden"] >> src.flying_chat_hidden
 		F["auto_capitalization"] >> src.auto_capitalization
 		F["local_deachat"] >> src.local_deadchat
+		if(isnull(src.local_deadchat))
+			src.local_deadchat = TRUE
+
+		F["tgui_fancy"] >> src.tgui_fancy
+		if(isnull(src.tgui_fancy))
+			src.tgui_fancy = 1
+		F["tgui_lock"] >> src.tgui_lock
 
 
 		if (isnull(src.name_first) || !length(src.name_first) || isnull(src.name_last) || !length(src.name_last))
@@ -346,14 +370,33 @@
 			src.target_cursor = "Default"
 
 
+		if (isnull(src.custom_parts))
+			src.custom_parts = list(
+				"l_arm" = "arm_default_left",
+				"r_arm" = "arm_default_right",
+			)
+
 		// Validate trait choices
 		if (src.traitPreferences.traits_selected == null)
 			src.traitPreferences.traits_selected = list()
 
 		for (var/T as anything in src.traitPreferences.traits_selected)
-			if (!(T in traitList)) src.traitPreferences.traits_selected.Remove(T)
+			if (!(T in traitList))
+				src.traitPreferences.traits_selected.Remove(T)
+				//migration for removed traits
+				if (T == "roboarms")
+					src.custom_parts["l_arm"] = "arm_robo_left"
+					src.custom_parts["r_arm"] = "arm_robo_right"
+					src.profile_modified = TRUE
+				else if (T == "syntharms")
+					src.custom_parts["l_arm"] = "arm_plant_left"
+					src.custom_parts["r_arm"] = "arm_plant_right"
+					src.profile_modified = TRUE
+				else if (T == "onearmed")
+					src.custom_parts["l_arm"] = "arm_missing_left"
+					src.profile_modified = TRUE
 
-		if (!src.traitPreferences.isValid())
+		if (!src.traitPreferences.isValid(src.traitPreferences.traits_selected, src.custom_parts))
 			src.traitPreferences.traits_selected.Cut()
 			tgui_alert(user, "Your traits couldn't be loaded. Please reselect your traits.", "Reselect traits")
 
@@ -413,78 +456,28 @@
 
 		return profile_name
 
-	/// Save a character profile to the cloud.
-	/// load_from (if not null) is the ckey to load this profile from. Can be used to load profiles from another ckey.
-	cloudsave_load(client/user, var/name, var/load_from)
-		if (user) // bypass these checks if we're loading from an arbitrary key
-			if(user && isnull( user.player.cloudsaves ))
-				return "Failed to retrieve cloud data, try rejoining."
-
+	/// Load a character profile from the cloud.
+	cloudsave_load(client/user, name)
+		if (user)
 			if (IsGuestKey(user.key))
-				return 0
+				return FALSE
 
-		// Fetch via HTTP from goonhub
-		var/datum/http_request/request = new()
-		request.prepare(RUSTG_HTTP_METHOD_GET, "[config.spacebee_api_url]/api/cloudsave?get&ckey=[ckey(load_from) || user.ckey]&name=[url_encode(name)]&api_key=[config.spacebee_api_key]", "", "")
-		request.begin_async()
-		UNTIL(request.is_complete())
-		var/datum/http_response/response = request.into_response()
-
-		if (response.errored || !response.body)
-			logTheThing(LOG_DEBUG, null, "<b>cloudsave_load:</b> Failed to contact goonhub. u: [user.ckey]")
-			return
-
-		var/list/ret = json_decode(response.body)
-		if( ret["status"] == "error" )
-			return ret["error"]["error"]
+		var/cloudSaveData = user.player.cloudSaves.getSave(name)
 
 		var/savefile/save = new
-		save.ImportText( "/", ret["savedata"] )
+		save.ImportText( "/", cloudSaveData )
 		return src.savefile_load(user, 1, save)
 
 	/// Save a character profile to the cloud.
-	/// save_to (if not null) is the ckey to save this profile to. Can be used to save profiles to another ckey.
-	cloudsave_save(client/user, var/name, var/save_to)
-		if (user) // bypass these checks if we're saving to an arbitrary key
-			if(isnull( user.player.cloudsaves ))
-				return "Failed to retrieve cloud data, try rejoining."
+	cloudsave_save(client/user, name)
+		if (user)
 			if (IsGuestKey( user.key ))
-				return 0
-			if (save_to)
-				CRASH("Tried to save a cloud save with a client and a key to save to specified- need one or the other")
+				return FALSE
 
-		var/savefile/save = src.savefile_save(ckey(save_to) || user.ckey, 1, 1)
+		var/savefile/save = src.savefile_save(user.ckey, 1, 1)
 		var/exported = save.ExportText()
 
-		// Fetch via HTTP from goonhub
-		var/datum/http_request/request = new()
-		request.prepare(RUSTG_HTTP_METHOD_GET, "[config.spacebee_api_url]/api/cloudsave?put&ckey=[ckey(save_to) || user.ckey]&name=[url_encode(name)]&api_key=[config.spacebee_api_key]&data=[url_encode(exported)]", "", "")
-		request.begin_async()
-		UNTIL(request.is_complete())
-		var/datum/http_response/response = request.into_response()
+		return user.player.cloudSaves.putSave(name, exported)
 
-		if (response.errored || !response.body)
-			logTheThing(LOG_DEBUG, null, "<b>cloudsave_load:</b> Failed to contact goonhub. u: [save_to || user.ckey]")
-			return
-
-		var/list/ret = json_decode(response.body)
-		if( ret["status"] == "error" )
-			return ret["error"]["error"]
-		user?.player.cloudsaves[ name ] = length( exported )
-		return 1
-
-	cloudsave_delete( client/user, var/name )
-
-		// Request deletion via HTTP from goonhub
-		var/datum/http_request/request = new()
-		request.prepare(RUSTG_HTTP_METHOD_GET, "[config.spacebee_api_url]/api/cloudsave?delete&ckey=[user.ckey]&name=[url_encode(name)]&api_key=[config.spacebee_api_key]", "", "")
-		request.begin_async()
-		UNTIL(request.is_complete())
-		var/datum/http_response/response = request.into_response()
-
-		if (response.errored || !response.body)
-			logTheThing(LOG_DEBUG, null, "<b>cloudsave_delete:</b> Failed to contact goonhub. u: [user.ckey]")
-			return
-
-		user.player.cloudsaves.Remove( name )
-		return 1
+	cloudsave_delete(client/user, name)
+		return user.player.cloudSaves.deleteSave(name)

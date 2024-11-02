@@ -5,7 +5,7 @@
  * @license MIT
  */
 
-import { BooleanLike } from 'common/react';
+import { BooleanLike } from 'tgui-core/react';
 
 export interface CharacterPreferencesData {
   isMentor: BooleanLike;
@@ -31,6 +31,7 @@ export interface CharacterPreferencesData {
   flavorText: string;
   securityNote: string;
   medicalNote: string;
+  syndintNote: string;
   fartsound: string;
   screamsound: string;
   chatsound: string;
@@ -61,19 +62,28 @@ export interface CharacterPreferencesData {
   hudTheme: string;
   hudThemePreview: string;
   tooltipOption: CharacterPreferencesTooltip;
+  scrollWheelTargeting: CharacterPreferencesScrollTarget;
   tguiFancy: BooleanLike;
   tguiLock: BooleanLike;
   viewChangelog: BooleanLike;
   viewScore: BooleanLike;
   viewTickets: BooleanLike;
   useClickBuffer: BooleanLike;
+  helpTextInExamine: BooleanLike;
   useWasd: BooleanLike;
   useAzerty: BooleanLike;
   preferredMap: string;
-  traitsData: Record<string, CharacterPreferencesTraitStaticData>
+  traitsData: Record<string, CharacterPreferencesTraitStaticData>;
   traitsAvailable: CharacterPreferencesTraitData[];
   traitsMax: number;
   traitsPointsTotal: number;
+  partsData: Record<string, CharacterPreferencesPartData>;
+}
+export interface CharacterPreferencesPartData {
+  id: string;
+  name: string;
+  points: number;
+  img: string;
 }
 
 export interface CharacterPreferencesTraitStaticData {
@@ -91,7 +101,8 @@ export interface CharacterPreferencesTraitData {
   available: BooleanLike;
 }
 
-export type CharacterPreferencesTrait = CharacterPreferencesTraitData & CharacterPreferencesTraitStaticData
+export type CharacterPreferencesTrait = CharacterPreferencesTraitData &
+  CharacterPreferencesTraitStaticData;
 
 export interface CharacterPreferencesProfile {
   active: boolean;
@@ -110,4 +121,10 @@ export enum CharacterPreferencesTooltip {
   Always = 1, // TOOLTIP_ALWAYS
   Never = 2, // TOOLTIP_NEVER
   Alt = 3, // TOOLTIP_ALT
+}
+
+export enum CharacterPreferencesScrollTarget {
+  Never = 1, // SCROLL_TARGET_NEVER
+  Hover = 2, // SCROLL_TARGET_HOVER
+  Always = 3, // SCROLL_TARGET_ALWAYS
 }

@@ -8,7 +8,8 @@
 	type_size = ARTIFACT_SIZE_LARGE
 	rarity_weight = 365
 	validtypes = list("ancient","martian","eldritch","precursor")
-	validtriggers = list(/datum/artifact_trigger/force,/datum/artifact_trigger/radiation,/datum/artifact_trigger/carbon_touch,/datum/artifact_trigger/silicon_touch,/datum/artifact_trigger/heat)
+	validtriggers = list(/datum/artifact_trigger/force,/datum/artifact_trigger/radiation,/datum/artifact_trigger/carbon_touch,/datum/artifact_trigger/silicon_touch,/datum/artifact_trigger/heat,
+		/datum/artifact_trigger/language)
 	fault_blacklist = list(ITEM_ONLY_FAULTS,TOUCH_ONLY_FAULTS)
 	activ_text = "suddenly starts warping space around it!"
 	deact_text = "deactivates, and lays silent."
@@ -43,6 +44,8 @@
 			playsound(O.loc, "warp", 50)
 			for (var/mob/living/M in orange(grab_range,O))
 				if (isintangible(M)) continue
-				M.set_loc(get_offset_target_turf(loc, rand(-grab_range, grab_range), rand(-grab_range, grab_range)))
+				var/warp_target = get_offset_target_turf(loc, rand(-grab_range, grab_range), rand(-grab_range, grab_range))
+				logTheThing(LOG_COMBAT, M, "was teleported by Warper artifact [O] from [log_loc(M)] to [log_loc(warp_target)].")
+				M.set_loc(warp_target)
 			O.set_loc(loc)
 			teleports++

@@ -21,17 +21,18 @@
 	SET_ADMIN_CAT(ADMIN_CAT_DEBUG)
 	set name = "Requisition Test"
 	set desc = "Generates a specified requisition path and pins it to market."
-
+	ADMIN_ONLY
+	SHOW_VERB_DESC
 	var/contract_path = input("Specify type path", "Requisition", null, null)
 	if (!contract_path) return
 	if (istext(contract_path))
 		contract_path = text2path(contract_path)
 	if (!ispath(contract_path))
-		boutput(usr, "<span class='alert'>Requisition test failed - no path specified.</span>")
+		boutput(usr, SPAN_ALERT("Requisition test failed - no path specified."))
 		return
 	var/datum/req_contract/new_contract = new contract_path
 	if(!istype(new_contract))
-		boutput(usr, "<span class='alert'>Requisition test failed - invalid type path.</span>")
+		boutput(usr, SPAN_ALERT("Requisition test failed - invalid type path."))
 		return
 	shippingmarket.req_contracts += new_contract
 	new_contract.pinned = TRUE
@@ -45,6 +46,7 @@
 #define RC_REAGENT 2
 #define RC_STACK 3
 #define RC_SEED 4
+#define RC_ARTIFACT 5
 
 //base entry
 ABSTRACT_TYPE(/datum/rc_entry)
@@ -71,12 +73,22 @@ ABSTRACT_TYPE(/datum/rc_entry)
 	proc/rc_eval(atom/eval_item)
 		. = FALSE
 
+	/**
+	 * Hook point for slight modifications to a contract entry's fulfillment condition.
+	 * This should ALWAYS be included in any entry variant, as late as possible in primary checks but before the rolling count is incremented.
+	 * It should return TRUE if additional checks pass, and FALSE if they do not.
+	 */
+	proc/extra_eval(atom/eval_item)
+		return TRUE
+
 ABSTRACT_TYPE(/datum/rc_entry/item)
 ///Basic item entry. Use for items that can't stack, and whose properties outside of path aren't relevant.
 /datum/rc_entry/item
 	entryclass = RC_ITEM
 	///Type path of the item the entry is looking for.
 	var/typepath
+	///Optional alternate type path to look for. Useful when an item has two functionally interchangeable forms, such as an empty or charged power cell.
+	var/typepath_alt
 	///If true, requires precise path; if false (default), sub-paths are accepted.
 	var/exactpath = FALSE
 	///Commodity path. If defined, will augment the per-item payout with the highest market rate for that commodity, and set the type path if not initially specified.
@@ -93,9 +105,58 @@ ABSTRACT_TYPE(/datum/rc_entry/item)
 	rc_eval(obj/eval_item)
 		. = ..()
 		if(rollcount >= count) return // Standard skip-if-complete
+		var/valid_item = FALSE
+		if(src.exactpath) // More fussy type evaluation
+			if(eval_item.type == typepath || (typepath_alt && eval_item.type == typepath_alt)) valid_item = TRUE
+		else // Regular type evaluation
+			if(istype(eval_item,typepath) || (typepath_alt && istype(eval_item,typepath_alt))) valid_item = TRUE
+		if(!valid_item) return
+		if(!extra_eval(eval_item)) return
+		src.rollcount++
+		. = TRUE
+
+ABSTRACT_TYPE(/datum/rc_entry/food)
+///Food item entry, used to properly detect food integrity.
+/datum/rc_entry/food
+	entryclass = RC_ITEM
+	///Type path of the item the entry is looking for.
+	var/typepath
+	///If true, requires precise path; if false (default), sub-paths are accepted.
+	var/exactpath = FALSE
+	/**
+	 * Food integrity determines how the requisition handles bites_left.
+	 * FOOD_REQ_BY_ITEM means each individual item fulfills one count, regardless of how many bites it has left.
+	 * FOOD_REQ_BY_BITE means each bite fulfills one count - useful for orders of sliceable foods like pizza.
+	 * FOOD_REQ_INTACT means the item's bites_left must be equal to the initial defined, suitable for items like fresh produce that should arrive intact.
+	 * If you are making a requisition for a particular food item and it's not sliceable, leave this with its default value.
+	 */
+	var/food_integrity = FOOD_REQ_INTACT
+
+	///Commodity path. If defined, will augment the per-item payout with the highest market rate for that commodity, and set the type path if not initially specified.
+	var/commodity
+
+	New()
+		if(src.commodity) // Fetch configuration data from commodity if specified
+			var/datum/commodity/CM = src.commodity
+			if(!src.typepath) src.typepath = initial(CM.comtype)
+			src.feemod += initial(CM.baseprice)
+			src.feemod += initial(CM.upperfluc)
+		..()
+
+	rc_eval(obj/item/reagent_containers/food/snacks/eval_item)
+		. = ..()
+		if(rollcount >= count) return // Standard skip-if-complete
 		if(src.exactpath && eval_item.type != typepath) return // More fussy type evaluation
 		else if(!istype(eval_item,typepath)) return // Regular type evaluation
-		src.rollcount++
+		if(!extra_eval(eval_item)) return
+		switch(food_integrity)
+			if(FOOD_REQ_INTACT)
+				if(eval_item.bites_left != eval_item.uneaten_bites_left) return
+				src.rollcount++
+			if(FOOD_REQ_BY_BITE)
+				src.rollcount += eval_item.bites_left
+			if(FOOD_REQ_BY_ITEM)
+				src.rollcount++
 		. = TRUE
 
 ABSTRACT_TYPE(/datum/rc_entry/stack)
@@ -108,6 +169,8 @@ ABSTRACT_TYPE(/datum/rc_entry/stack)
 	var/typepath_alt
 	///Commodity path. If defined, will augment the per-item payout with the highest market rate for that commodity, and set the type path if not initially specified.
 	var/commodity
+	///Material ID string. If defined, will require the stack's material's mat_id to match the specified mat_id.
+	var/mat_id
 
 	New()
 		if(src.commodity) // Fetch configuration data from commodity if specified
@@ -121,7 +184,11 @@ ABSTRACT_TYPE(/datum/rc_entry/stack)
 		. = ..()
 		if(rollcount >= count) return // Standard skip-if-complete
 		if(!istype(eval_item)) return // If it's not an item, it's not a stackable
+		if(mat_id) // If we're checking for a material, do that here with a tag comparison
+			if(!eval_item.material || eval_item.material.getID() != src.mat_id)
+				return
 		if(istype(eval_item,typepath) || (typepath_alt && istype(eval_item,typepath_alt)))
+			if(!extra_eval(eval_item)) return
 			rollcount += eval_item.amount
 			. = TRUE // Let manager know passed eval item is claimed by contract
 
@@ -135,11 +202,14 @@ ABSTRACT_TYPE(/datum/rc_entry/reagent)
 	var/contained_in
 	///Plural description of that container - beakers, patches, pills, etc. First letter capitalized. Should be set if contained_in is set.
 	var/container_name
+	///If set to true, entirety of requested reagent must be within a single reagent container in the shipment
+	var/single_container = FALSE
 
 	rc_eval(atom/eval_item)
 		. = ..()
 		if(rollcount >= count) return //standard skip-if-complete
 		if(contained_in && !istype(eval_item,contained_in)) return // Do we have a required container type? If so, validate it
+		if(!extra_eval(eval_item)) return
 		if(eval_item.reagents)
 			var/C // Total count of matching reagents, by unit
 			if(islist(src.chem_ids)) // If there are multiple reagents to evaluate, iterate by chem IDs
@@ -147,9 +217,13 @@ ABSTRACT_TYPE(/datum/rc_entry/reagent)
 					C += eval_item.reagents.get_reagent_amount(chemplural)
 			else // If there's just the one, check for it directly
 				C = eval_item.reagents.get_reagent_amount(src.chem_ids)
-			if(C)
+			if(single_container && C >= count) // for single-container evaluation
 				rollcount += C
-				. = TRUE // Let manager know reagent was found in passed eval item
+				. = TRUE
+			else
+				if(C)
+					rollcount += C
+					. = TRUE // Let manager know reagent was found in passed eval item
 
 ///Seed entry. Searches for seeds of the correct crop name, typically matching a particular genetic makeup.
 ABSTRACT_TYPE(/datum/rc_entry/seed)
@@ -186,14 +260,15 @@ ABSTRACT_TYPE(/datum/rc_entry/seed)
 		var/obj/item/seed/cultivar = eval_item
 		if(!cultivar.plantgenes) return // No genome? Skip it
 		if(cultivar.planttype.name != cropname) return // Wrong species? Skip it
+		if(!extra_eval(eval_item)) return
 
 		gene_count = 0
 		for(var/index in gene_reqs) // Iterate over each parameter to see if the genome meets it, or exceeds it in the right direction
 			switch(index)
 				if("Maturation")
-					if(cultivar.plantgenes.growtime <= gene_reqs["Maturation"]) gene_count++
+					if(cultivar.plantgenes.growtime >= gene_reqs["Maturation"]) gene_count++
 				if("Production")
-					if(cultivar.plantgenes.harvtime <= gene_reqs["Production"]) gene_count++
+					if(cultivar.plantgenes.harvtime >= gene_reqs["Production"]) gene_count++
 				if("Lifespan")
 					if(cultivar.plantgenes.harvests >= gene_reqs["Lifespan"]) gene_count++
 				if("Yield")
@@ -206,6 +281,39 @@ ABSTRACT_TYPE(/datum/rc_entry/seed)
 		if(gene_count >= gene_factors) // Compare satisfied parameter count to number of parameters. Met or exceeded means seed satisfies requirements
 			src.rollcount++
 			. = TRUE // Let manager know seed passes muster and is claimed by contract
+
+///Artifact entry. Evaluates provided handheld artifacts based on their artifact parameters.
+ABSTRACT_TYPE(/datum/rc_entry/artifact)
+/datum/rc_entry/artifact
+	entryclass = RC_ARTIFACT
+	///Origin requirement, checked against the artifact's type_name if specified. Current type names are Silicon, Martian, Wizard, Eldritch, Precursor
+	var/required_origin
+	///Types of artifact functionality desired. Can be left empty.
+	var/acceptable_types = list()
+
+	New()
+		..()
+
+	rc_eval(atom/eval_item)
+		. = ..()
+		if(rollcount >= count) return // Standard skip-if-complete
+		var/obj/eval_obj = eval_item
+		if(!istype(eval_obj)) return // Not an object? Not an artifact
+		if(!istype(eval_obj.artifact,/datum/artifact/)) return // No artifact data? Skip it
+
+		var/datum/artifact/arty = eval_obj.artifact
+
+		if(required_origin && arty.artitype.type_name != required_origin) return
+		if(length(acceptable_types))
+			var/is_acceptable_type = FALSE
+			for(var/nom in acceptable_types)
+				if(arty.type_name == nom)
+					is_acceptable_type = TRUE
+			if(!is_acceptable_type) return
+
+		if(!extra_eval(eval_item)) return
+		src.rollcount++
+		. = TRUE // Let manager know artifact passes muster and is claimed by contract
 
 /**
  * Item reward datum optionally used in contract creation.
@@ -254,6 +362,8 @@ ABSTRACT_TYPE(/datum/req_contract)
 	var/weight = 100
 
 	///A baseline amount of cash you'll be given for fulfilling the requisition; this is modified by entries
+	///The current thinking as of the time of writing this comment is for this to be 10 times some salary's wage,
+	///times an additional modifier based on difficulty
 	var/payout = 0
 	///List of contract entry datums; sent cargo will be passed into these for evaluation
 	var/list/rc_entries = list()
@@ -267,6 +377,8 @@ ABSTRACT_TYPE(/datum/req_contract)
 	var/requis_desc = ""
 	///Tracks whether contract is pinned; one contract at a time may be pinned, reserving it for QM and preventing it from leaving with market shift
 	var/pinned = FALSE
+	///determines payout multiplier
+	var/static/count = 0
 
 	New() //in individual definitions, create entries and THEN call this, it'll get things set up for you
 		..()
@@ -284,10 +396,13 @@ ABSTRACT_TYPE(/datum/req_contract)
 					src.requis_desc += "[rce.count]x [rce.name]<br>"
 				if(RC_REAGENT)
 					var/datum/rc_entry/reagent/rchem = rce
-					if(rchem.container_name)
-						src.requis_desc += "[rchem.container_name] containing [rchem.count]+ unit[s_es(rchem.count)] of [rchem.name]<br>"
+					if(rchem.single_container)
+						src.requis_desc += "[rchem.count] unit[s_es(rchem.count)] of [rchem.name] in discrete vessel<br>"
 					else
-						src.requis_desc += "[rchem.count]+ unit[s_es(rchem.count)] of [rchem.name]<br>"
+						if(rchem.container_name)
+							src.requis_desc += "[rchem.container_name] containing [rchem.count]+ unit[s_es(rchem.count)] of [rchem.name]<br>"
+						else
+							src.requis_desc += "[rchem.count]+ unit[s_es(rchem.count)] of [rchem.name]<br>"
 				if(RC_STACK)
 					src.requis_desc += "[rce.count]+ [rce.name]<br>"
 				if(RC_SEED)
@@ -295,23 +410,41 @@ ABSTRACT_TYPE(/datum/req_contract)
 					if(length(rceed.gene_reqs))
 						src.requis_desc += "[rce.count]x [rceed.cropname] seed with following traits:<br>"
 						for(var/index in rceed.gene_reqs)
-							if(index == "Maturation" || index == "Production")
-								src.requis_desc += "* [index]: [rceed.gene_reqs[index]] or lower<br>"
-							else
-								src.requis_desc += "* [index]: [rceed.gene_reqs[index]] or higher<br>"
+							src.requis_desc += "* [index]: [rceed.gene_reqs[index]] or higher<br>"
 					else
 						src.requis_desc += "[rce.count]x [rceed.cropname] seed<br>"
+				if(RC_ARTIFACT)
+					var/datum/rc_entry/artifact/rcart = rce
+					src.requis_desc += "x[rce.count] handheld artifact with following parameters<br>"
+					if(rcart.required_origin)
+						src.requis_desc += "| Origin class: [rcart.required_origin]<br>"
+					else
+						src.requis_desc += "| Origin class: any<br>"
+					if(length(rcart.acceptable_types))
+						src.requis_desc += "| Acceptable categories:<br>"
+						for(var/index in rcart.acceptable_types)
+							src.requis_desc += "| [index]<br>"
+					else
+						src.requis_desc += "| Acceptable categories: Any<br>"
 			src.payout += rce.feemod * rce.count
+		src.payout *= 1.1**count + 0.1*count
 
-	proc/requisify(obj/storage/crate/sell_crate)
-		var/contents_index = list() //registry of everything in crate, including contents of item containers within it
-		var/contents_to_cull = list() //things consumed to fulfill the requisition, extras are sent back
-		var/successes_needed = length(src.rc_entries) //decremented with each successful fulfillment, reach 0 to win
+/**
+ * Called to tally a crate's contents, to evaluate whether they've fulfilled the contract.
+ * If only_evaluate is FALSE, the proc will actually consume relevant contents, and return a post-sale handling code appropriately.
+ * If only_evaluate is TRUE, the proc will simply index relevant contents, and return a textual summary of detected contract fulfillment.
+ */
+	proc/requisify(obj/storage/crate/sell_crate, only_evaluate = FALSE)
+		var/contents_index = list() //Registry of everything in crate, including contents of item containers within it
+		var/contents_to_cull = list() //Things consumed to fulfill the requisition - extras are sent back
+		var/eval_message = "<font color=#FF9900>Contents insufficient for marked requisition" //Used in only_evaluate mode, start of the return text
+		var/successes_needed = length(src.rc_entries) //Decremented with each successful fulfillment, reach 0 to win
 
 		contents_index += sell_crate.contents
 
-		for(var/obj/item/storage/S in sell_crate.contents)
-			contents_index += S.get_all_contents()
+		for(var/atom/A in sell_crate.contents)
+			if (A.storage)
+				contents_index += A.storage.get_all_contents()
 
 		. = REQ_RETURN_NOSALE //by default return no success
 
@@ -333,14 +466,14 @@ ABSTRACT_TYPE(/datum/req_contract)
 							box_satisfies = TRUE
 				qdel(testbench_item)
 
-			if(box_satisfies)
+			if(box_satisfies && !only_evaluate)
 				contents_to_cull += IB
 
 		for(var/atom/A in contents_index)
 			LAGCHECK(LAG_LOW)
 			for(var/datum/rc_entry/shoppin in rc_entries)
-				if(shoppin.rc_eval(A)) //found something that the requisition asked for, let it know
-					if(A.loc != sell_crate && isobj(A.loc)) //if you sent your stuff in an item container, it'll be kept
+				if(shoppin.rc_eval(A) && !only_evaluate) //if we found something that the requisition asked for, prepare it for removal if live
+					if(A.loc != sell_crate && isobj(A.loc)) //if you sent your stuff in an item container, recipient will keep it
 						contents_to_cull |= A.loc
 					else
 						contents_to_cull += A
@@ -348,22 +481,32 @@ ABSTRACT_TYPE(/datum/req_contract)
 		for(var/datum/rc_entry/shopped in rc_entries)
 			if(shopped.rollcount >= shopped.count)
 				successes_needed--
+			else if(only_evaluate)
+				eval_message += " | '[shopped.name]' [shopped.rollcount]/[shopped.count]"
 
-		if(!successes_needed)
-			if(src.req_code == "REQ-THIRDPARTY") //third party sales do not preserve leftover items, returns are only done if there is an item reward
-				for(var/atom/X in contents_index)
-					if(X) qdel(X)
-				return REQ_RETURN_FULLSALE
-			if(src.pinned) shippingmarket.has_pinned_contract = FALSE //tell shipping market pinned contract was fulfilled
-			. = REQ_RETURN_SALE //sale, but may be leftover items. find out by culling
-			for(var/atom/X in contents_to_cull)
-				if(X) qdel(X)
-			if(!length(sell_crate.contents)) //total clean sale, tell shipping manager to del the crate
-				. = REQ_RETURN_FULLSALE
-		else //sale unsuccessful; reset rolling counts of all contract entries in preparation for subsequent fulfillment attempts
-			for(var/datum/rc_entry/shopped in rc_entries)
+		if(only_evaluate) //evaluation mode conclusion: return evaluation text, do nothing else
+			if(!successes_needed) //would successfully sell
+				. = "Contents sufficient for marked requisition."
+			else //wouldn't successfully sell; close out the red
+				eval_message += "</font>"
+				. = eval_message
+			for(var/datum/rc_entry/shopped in rc_entries) //clean up afterwards, either way
 				shopped.rollcount = 0
-		return
+
+		else //live mode conclusion: cull contents, return an appropriate handling code
+			if(!successes_needed)
+				if(src.req_code == "REQ-THIRDPARTY") //third party sales do not preserve leftover items, returns are only done if there is an item reward
+					for(var/atom/X in contents_index)
+						if(X) qdel(X)
+					return REQ_RETURN_FULLSALE
+				. = REQ_RETURN_SALE //sale, but may be leftover items. find out by culling
+				for(var/atom/X in contents_to_cull)
+					if(X) qdel(X)
+				if(!length(sell_crate.contents)) //total clean sale, tell shipping manager to del the crate
+					. = REQ_RETURN_FULLSALE
+			else //sale unsuccessful; reset rolling counts of all contract entries in preparation for subsequent fulfillment attempts
+				for(var/datum/rc_entry/shopped in rc_entries)
+					shopped.rollcount = 0
 
 #undef RC_ITEM
 #undef RC_REAGENT
